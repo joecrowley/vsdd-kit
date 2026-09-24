@@ -85,8 +85,27 @@ grep -rli "diagram" "$ROOT"/.*/skills/openspec-*/SKILL.md 2>/dev/null | head -3
 | `vsdd:` markers found | This kit is already installed | Treat as an upgrade. Steps are idempotent |
 | "diagram" found but no `vsdd:` markers | Skills were **hand-edited** for diagrams | Follow **Step 1b** before Step 5, or the steps will be duplicated |
 
+**Make the install reversible**, before changing anything:
+
+1. **Branch.** If `ROOT` is a git repo, create an install branch and do all the work on
+   it: `git -C "$ROOT" switch -c vsdd-install`. If that name is taken, add a suffix.
+   Uncommitted changes the user agreed to keep carry over to the branch. Tell the
+   user which branch you created. Git undoes everything **tracked**.
+2. **Snapshot.** Save what git can't restore: files in the install's footprint that
+   git doesn't track (often gitignored tool folders such as `.claude/` or
+   `.opencode/`, and untracked `/opsx` commands), the global OpenSpec config, and
+   the CLI version:
+
+   ```bash
+   python3 "$KIT"/files/scripts/vsdd/vsdd_snapshot.py --root "$ROOT" save
+   ```
+
+   Note the printed snapshot directory. It is stored outside the project, under
+   `~/.vsdd-snapshots/`, so `git clean` can't delete it.
+
 **Verify:** you have values for `ROOT` and `TOOLS`, `openspec --version` is ≥ 1.2.0,
-and `python3` works.
+`python3` works, you're on the install branch (if `ROOT` is a git repo), and the
+snapshot directory exists and contains `manifest.json`.
 
 ---
 
@@ -161,6 +180,7 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 | `scripts/vsdd/install_overlay.py` | `scripts/vsdd/install_overlay.py` | Overwrite |
 | `scripts/vsdd/merge_diagrams.py` | `scripts/vsdd/merge_diagrams.py` | Overwrite |
 | `scripts/vsdd/openspec_preflight.py` | `scripts/vsdd/openspec_preflight.py` | Overwrite |
+| `scripts/vsdd/vsdd_snapshot.py` | `scripts/vsdd/vsdd_snapshot.py` | Overwrite |
 
 ```bash
 mkdir -p "$ROOT"/openspec/schemas "$ROOT"/docs "$ROOT"/scripts/vsdd
@@ -393,14 +413,17 @@ Reply with:
 - Smoke test: passed, removed
 - In-flight changes: <list from the preflight, or "none">. They keep their original
   schema, so they have no diagrams.md and their archive does no diagram merge
+- Branch: <vsdd-install | not a git repo>. Snapshot: <snapshot dir>
 - Decisions I made: <list>
 - Needs your attention: <anything skipped, failed, or deferred>
+- To undo the whole install: see "Roll back an install" in SETUP.md
 
 Next: try `/opsx:propose <small change with a visual impact>` and review its diagrams.md.
 ```
 
-Then suggest the user commit everything as a single commit, for example
-`chore: install visual spec-driven development (VSDD)`. Do not commit unless asked.
+Then suggest the user commit everything on the install branch as a single commit,
+for example `chore: install visual spec-driven development (VSDD)`, review it, and
+merge the branch when they're happy. Do not commit or merge unless asked.
 
 ---
 
@@ -412,6 +435,7 @@ Then suggest the user commit everything as a single commit, for example
 | `openspec update` or `openspec init` was run | `python3 scripts/vsdd/install_overlay.py`. CI's `--check` catches a forgotten run |
 | OpenSpec upgraded to a new minor or major version | Run the overlay with `--dry-run` first. On `anchor not found`, see Step 5 |
 | A new AI tool is added | `openspec update` (after adding the tool via `openspec init --tools`), then the overlay |
+| Before a kit upgrade or `openspec update` | Branch, then `python3 scripts/vsdd/vsdd_snapshot.py save`, so you can roll back |
 | Kit upgraded | Re-run Steps 2, 3 (new `rules`/`operations` entries, e.g. the Placement rule) and 4. Changes still in flight need a `## Placement` table added before they validate. For Step 5, first restore stock skills with `openspec update`, then run the overlay. Blocks already marked `vsdd:` are skipped, so their text only refreshes from stock |
 
 ## Troubleshooting
@@ -430,7 +454,40 @@ Then suggest the user commit everything as a single commit, for example
 | `openspec archive` used directly | The CLI has no diagram merge | Run `python3 scripts/vsdd/merge_diagrams.py openspec/changes/archive/<dated-name>` (see `docs/VSDD.md` §4) |
 | `merge_diagrams.py` refuses: "not a verbatim copy" | The Source of Truth changed after the change was proposed (e.g. another change archived first) | Re-copy the Before sections from the current Source of Truth, re-check that the After State still makes sense, then merge again |
 
+## Roll back an install
+
+Use this to undo an install or upgrade completely, for example after a trial run.
+Do the steps in this order: git first, then the snapshot.
+
+1. **Tracked files: return to the original branch.** If the install branch has
+   uncommitted changes, **ASK** whether to discard them (`git -C "$ROOT" stash` keeps
+   them, just in case). Then run `git -C "$ROOT" switch <original branch>`. Git
+   removes or restores everything it tracks.
+2. **Untracked files and the global config.** Preview first, then apply:
+
+   ```bash
+   python3 "$KIT"/files/scripts/vsdd/vsdd_snapshot.py --root "$ROOT" restore <snapshot dir> --dry-run
+   python3 "$KIT"/files/scripts/vsdd/vsdd_snapshot.py --root "$ROOT" restore <snapshot dir> --yes
+   ```
+
+   This restores saved untracked files, and deletes untracked footprint files that
+   didn't exist at save time.
+   - If it reports that the global OpenSpec config differs, **ASK** before adding
+     `--restore-global`. The config is machine-wide, and the difference may be a
+     change the user made on purpose, such as adding workflows to their profile.
+   - If it reports a different CLI version, show the `npm install -g` command it
+     prints, and let the user decide.
+3. **Delete the install branch**, only if the user confirms, because unmerged work on
+   it is lost: `git -C "$ROOT" branch -D vsdd-install`.
+4. Run the restore with `--dry-run` again. It should report nothing to restore.
+
+`python3 "$KIT"/files/scripts/vsdd/vsdd_snapshot.py --root "$ROOT" latest` prints the
+newest snapshot for the project.
+
 ## Uninstall
+
+To remove VSDD while keeping OpenSpec and your diagrams, for example long after
+installing:
 
 1. Set `schema: spec-driven` in `openspec/config.yaml`, and delete the `rules.diagrams` entries.
 2. `openspec update --force` to restore stock skills and commands.

@@ -212,6 +212,41 @@ print(sorted(set($PREDICTED) - left) == sorted($PREDICTED) and not (set($PREDICT
 [ "$GONE" = "True" ] && pass "plain update deleted exactly the predicted workflows (the risk is real)" || fail "prediction did not match plain update"
 cd "$ROOT"
 
+step "Rollback: branch + snapshot restores everything"
+ROOT3="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-rollback.XXXXXX")"
+XR="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-rbcfg.XXXXXX")"
+SNAP="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-snap.XXXXXX")/snap"
+[ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT" "$XDG" "$ROOT2" "$XFULL" "$XLESS" "$ROOT3" "$XR" "$(dirname "$SNAP")"' EXIT
+mkdir -p "$XR/openspec"
+printf '{"profile":"custom","telemetry":{"noticeSeen":true},"workflows":["propose","explore","apply","sync","archive","verify"]}\n' > "$XR/openspec/config.json"
+SNAPPY="$KIT/files/scripts/vsdd/vsdd_snapshot.py"
+cd "$ROOT3"; git init -q -b main
+printf '.claude/\n' > .gitignore
+XDG_CONFIG_HOME="$XR" openspec init --tools claude . </dev/null >/dev/null 2>&1 || fail "init (rollback project)"
+git add -A && git -c user.name=t -c user.email=t@t commit -qm base
+state() { (cd "$ROOT3" && find . -path ./.git -prune -o -type f -print0 | sort -z | xargs -0 shasum | shasum; shasum "$XR/openspec/config.json" | cut -c1-40); }
+BEFORE="$(state)"
+git switch -q -c vsdd-install
+XDG_CONFIG_HOME="$XR" python3 "$SNAPPY" save --out "$SNAP" >/dev/null && [ -f "$SNAP/manifest.json" ] \
+  && pass "snapshot saved (untracked .claude + global config)" || fail "snapshot save"
+mkdir -p openspec/schemas docs scripts/vsdd
+cp -R "$KIT"/files/openspec/schemas/visual-driven openspec/schemas/
+cp "$KIT"/files/docs/VSDD.md "$KIT"/files/docs/MERMAID_RULES.md docs/
+cp "$KIT"/files/scripts/vsdd/*.py scripts/vsdd/
+cp "$KIT"/files/openspec/config.yaml.example openspec/config.yaml
+cp "$KIT"/files/agents/AGENTS.vsdd.md AGENTS.md; printf '@AGENTS.md\n' > CLAUDE.md
+python3 scripts/vsdd/install_overlay.py >/dev/null || fail "overlay (rollback project)"
+git add -A && git -c user.name=t -c user.email=t@t commit -qm "install VSDD"
+printf '{"profile":"core"}\n' > "$XR/openspec/config.json"
+[ "$(state)" != "$BEFORE" ] && pass "install changed tracked, untracked and global state" || fail "install changed nothing?"
+git switch -q main
+XDG_CONFIG_HOME="$XR" python3 "$SNAPPY" restore "$SNAP" --yes --restore-global >/dev/null || fail "snapshot restore"
+git branch -q -D vsdd-install
+[ "$(state)" = "$BEFORE" ] && pass "rollback is byte-identical (working tree + global config)" || fail "rollback left differences"
+XDG_CONFIG_HOME="$XR" python3 "$SNAPPY" restore "$SNAP" --dry-run | grep -q "nothing to restore" \
+  && pass "second restore: nothing to restore" || fail "restore not idempotent"
+cd "$ROOT"
+
 printf '\n\033[32mAll checks passed.\033[0m\n'
 [ -n "${KEEP:-}" ] && echo "Project kept at $ROOT"
 exit 0

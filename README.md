@@ -153,7 +153,7 @@ python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay wa
 | `.<tool>/skills/openspec-*` | Stock OpenSpec skills with the VSDD steps inserted, each marked `<!-- vsdd:… -->` |
 | `openspec/config.yaml` `operations` | The key VSDD steps, repeated as CLI guidance (newer OpenSpec) |
 | `.<tool>/command*/opsx-*` | Thin wrappers that load those skills |
-| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before), `merge_diagrams.py` (the archive merge, deterministic), `install_overlay.py`, `openspec_preflight.py` (what `openspec update` would delete, tools to add) |
+| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before), `merge_diagrams.py` (the archive merge, deterministic), `install_overlay.py`, `openspec_preflight.py` (what `openspec update` would delete, tools to add), `vsdd_snapshot.py` (saves and restores what git can't) |
 | `.github/workflows/vsdd.yml` | CI: render every diagram and check the overlay (optional) |
 
 ## Design notes
@@ -202,6 +202,12 @@ the quotes show up in the rendered output. The validator enforces all of these, 
 > tells you exactly which ones, and `--safe-update` updates without deleting them.
 > The lasting fix is adding every workflow you use with `openspec config profile`.
 
+**Every install is reversible.** The agent works on a `vsdd-install` branch, and
+first saves a snapshot, outside the project, of what git can't restore: gitignored
+tool folders, untracked `/opsx` commands, your global OpenSpec config and the CLI
+version. Rolling back means switching branch, then running
+`vsdd_snapshot.py restore`. See "Roll back an install" in `SETUP.md`.
+
 **Installing into a project that already uses OpenSpec** is supported. The runbook
 runs the preflight first. It keeps your specs, changes and `config.yaml` entries,
 asks before replacing a custom schema, never deletes workflows without asking, and
@@ -234,6 +240,9 @@ OpenSpec, and checks every Verify condition:
   - `--safe-update` keeps every workflow;
   - `init --tools` adds a tool without touching the setup;
   - a plain `update` deletes exactly what was predicted.
+- **rollback:** branch, snapshot, install (committed, and changing the global config),
+  then switch back and restore. The working tree and global config come back
+  byte-identical.
 - recovery after `openspec update`
 
 By default it uses an isolated OpenSpec config with **every workflow enabled**, so the
@@ -255,7 +264,7 @@ vsdd-kit/
     ├── openspec/                ← schema, templates, config example, Source of Truth skeleton
     ├── docs/                    ← VSDD.md, MERMAID_RULES.md
     ├── agents/                  ← AGENTS.md section, CLAUDE.md example
-    ├── scripts/vsdd/            ← install_overlay.py, validate_mermaid.py, merge_diagrams.py, openspec_preflight.py
+    ├── scripts/vsdd/            ← install_overlay.py, validate_mermaid.py, merge_diagrams.py, openspec_preflight.py, vsdd_snapshot.py
     └── ci/github/vsdd.yml       ← GitHub Actions workflow
 ```
 
