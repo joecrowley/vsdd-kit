@@ -62,6 +62,8 @@ OUT="$(openspec instructions diagrams --change vsdd-smoke-test 2>/dev/null)"
 for pat in "<project_context>" "<rules>" "MERMAID_RULES"; do
   grep -q "$pat" <<<"$OUT" && pass "diagrams instructions contain $pat" || fail "missing $pat in instructions"
 done
+openspec instructions design --change vsdd-smoke-test 2>/dev/null | grep -q "decisions.md" \
+  && pass "design instructions point at decisions.md" || fail "design instructions miss decisions.md"
 if openspec instructions --help 2>&1 | grep -q archive; then
   openspec instructions archive --change vsdd-smoke-test --json 2>/dev/null | grep -q "VSDD" \
     && pass "operations.archive guidance delivered by CLI" || fail "operations.archive guidance missing"
@@ -74,6 +76,7 @@ fi
 step "4. agent files"
 cp "$KIT"/files/agents/AGENTS.vsdd.md AGENTS.md
 grep -q "docs/VSDD.md" AGENTS.md && pass "AGENTS.md routes to docs/VSDD.md" || fail "AGENTS.md snippet"
+grep -q "decisions.md" AGENTS.md && pass "AGENTS.md routes to decisions.md" || fail "AGENTS.md misses decisions.md"
 
 step "5. overlay"
 python3 scripts/vsdd/install_overlay.py --check >/dev/null && fail "--check should fail before overlay" || pass "--check detects missing overlay"
@@ -83,6 +86,8 @@ before="$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)"
 python3 scripts/vsdd/install_overlay.py >/dev/null
 [ "$before" = "$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)" ] && pass "overlay idempotent" || fail "overlay not idempotent"
 grep -q "vsdd:wrapper" .*/command*/opsx*archive* .*/commands/opsx/archive.md 2>/dev/null && pass "commands wrapped" || fail "commands not wrapped"
+grep -q "vsdd:archive-decisions" .*/skills/openspec-archive-change/SKILL.md && grep -q "vsdd:gen-decisions" .*/skills/openspec-propose/SKILL.md \
+  && pass "decisions steps patched into propose and archive" || fail "decisions steps missing"
 for s in propose apply-change verify-change archive-change continue-change ff-change update-change bulk-archive-change; do
   for f in .*/skills/openspec-$s/SKILL.md; do
     [ -e "$f" ] || continue
@@ -94,6 +99,12 @@ step "6. seed Source of Truth"
 mkdir -p openspec/specs/architecture
 cp "$KIT"/files/openspec/specs/architecture/diagrams.md.example openspec/specs/architecture/diagrams.md
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "seed diagrams lint clean" || fail "seed diagrams lint"
+DEC=openspec/specs/architecture/decisions.md
+cp "$KIT"/files/openspec/specs/architecture/decisions.md.example "$DEC"
+python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "decisions log validates" || fail "decisions log rejected"
+sed -i.bak '/\*\*Rule:\*\*/d' "$DEC" && rm -f "$DEC.bak"
+grep -q "needs \*\*Rule:\*\*" <<<"$(python3 scripts/vsdd/validate_mermaid.py 2>&1 || true)" && pass "decision without a Rule caught" || fail "decision without a Rule not caught"
+rm -f "$DEC"
 if [ "$HAVE_MMDC" = 1 ]; then
   python3 scripts/vsdd/validate_mermaid.py --render >/dev/null && pass "seed diagrams render" || fail "seed diagrams render"
 else

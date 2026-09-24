@@ -15,6 +15,8 @@ context: |
   Stack: <languages, frameworks, state management, backend, infra>.
   Layout: <top-level modules/packages and what they own>.
   Conventions: <error handling, DI, testing, naming - only the ones agents get wrong>.
+  Pitfalls: <optional: the 1-3 costliest rules from openspec/specs/architecture/decisions.md,
+    one line each, e.g. "after a write, refresh without a loading state (Silent Refresh After Writes)">.
 
 # Per-artifact constraints. The `diagrams` rules are part of VSDD - keep them.
 # Add project rules to the other artifacts as needed.
@@ -27,7 +29,10 @@ rules:
     - "Copy the Before State verbatim from the file each Placement row names (for a move, the old file); copy only the affected stable-named sections."
     - "Keep stable section names unchanged when modifying an existing diagram - the archive merge targets sections by name."
     - "If no visual concern is affected, record NO with a one-line reason and omit Before/After sections."
+  design:
+    - "Read openspec/specs/architecture/decisions.md first and follow every rule that applies. To break one, write `Overrides: <Stable Name> - <why>` under Decisions."
   tasks:
+    - "If the change has no design.md, apply the rules in openspec/specs/architecture/decisions.md to the tasks."
     - "If diagrams.md has a YES gate, the final task group MUST include: trace the After State against the code and record any Deviations, then run python3 scripts/vsdd/validate_mermaid.py."
 
 # VSDD backstop: delivered by the CLI to the stock apply/archive skills, so the key
@@ -39,3 +44,4 @@ operations:
   archive:
     guidance:
       - "VSDD: before moving the change to the archive, merge its diagrams.md into the Source of Truth: run python3 scripts/vsdd/merge_diagrams.py <change dir> (with --dry-run first). Without the script, apply every row of its `## Placement` table as described in docs/VSDD.md section 4 (remove, move from <old file>, update, add). Skip if the gate is NO. Never touch sections without a Placement row, and never merge Before State, Placement or Deviations. Run python3 scripts/vsdd/validate_mermaid.py afterwards, and include a Diagrams line in the archive summary."
+      - "VSDD: if the change fixed a bug caused by a pattern that could recur elsewhere, or set a convention other changes must follow, draft an entry for openspec/specs/architecture/decisions.md (Rule / Why / Applies to / Source: <archived change name>) and ask the user before adding it. If its design.md overrides a decision, ask whether to update or retire that entry. Include a Decisions line in the archive summary."

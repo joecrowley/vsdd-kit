@@ -355,6 +355,13 @@ VSDD needs a baseline, otherwise every Before state is empty. Build it from the
    (`openspec/specs/<capability>/diagrams.md`) for 1–3 high-traffic capabilities.
    Only do so if `openspec/specs/<capability>/` already exists.
 5. Follow `docs/MERMAID_RULES.md` exactly.
+6. **Decisions log.** If `ROOT/openspec/specs/architecture/decisions.md` doesn't exist,
+   create it with the header and introduction from
+   `KIT/files/openspec/specs/architecture/decisions.md.example`, **without** the
+   example entry. Don't invent rules. If the project already documents conventions
+   that agents get wrong (in `AGENTS.md`, a contributing guide, or past fixes the
+   user mentions), **ASK** whether to turn up to three of them into entries, with
+   `Source: install`.
 
 **Verify:**
 
@@ -423,6 +430,7 @@ Reply with:
 - Agent files: <AGENTS.md created/updated>, <CLAUDE.md created/updated/n.a.>
 - Overlay: <N> skills patched, <M> commands wrapped (check: OK)
 - Source of Truth: <files and stable section names>
+- Decisions log: <created empty | N entries | already existed>
 - CI: <added .github/workflows/vsdd.yml | skipped | instructions given>
 - Smoke test: passed, removed
 - In-flight changes: <list from the preflight, or "none">. They keep their original
@@ -450,7 +458,7 @@ merge the branch when they're happy. Do not commit or merge unless asked.
 | OpenSpec upgraded to a new minor or major version | Run the overlay with `--dry-run` first. On `anchor not found`, see Step 5 |
 | A new AI tool is added | `openspec update` (after adding the tool via `openspec init --tools`), then the overlay |
 | Before a kit upgrade or `openspec update` | Branch, then `python3 scripts/vsdd/vsdd_snapshot.py save`, so you can roll back |
-| Kit upgraded | Re-run Steps 2, 3 (new `rules`/`operations` entries, e.g. the Placement rule) and 4. Changes still in flight need a `## Placement` table added before they validate. For Step 5, first restore stock skills with `openspec update`, then run the overlay. Blocks already marked `vsdd:` are skipped, so their text only refreshes from stock |
+| Kit upgraded | Re-run Steps 2, 3 (new `rules`/`operations` entries, e.g. the Placement and decisions rules) and 4, and item 6 of Step 6 if there's no `decisions.md` yet. Changes still in flight need a `## Placement` table added before they validate. For Step 5, first restore stock skills with `openspec update`, then run the overlay. Blocks already marked `vsdd:` are skipped, so their text only refreshes from stock |
 
 ## Troubleshooting
 
@@ -464,6 +472,8 @@ merge the branch when they're happy. Do not commit or merge unless asked.
 | Validator: "... has no Placement row" | A Before or After section isn't listed in `## Placement` | Add a row (update / add / move from / remove), or delete the stray section |
 | Validator: "... goes into the architecture file: add a 4th column 'Why here'" | A row adds or moves a diagram into `specs/architecture/diagrams.md` without saying why it's cross-cutting | If it shows one capability's behaviour, place it in `specs/<capability>/diagrams.md`. Otherwise fill in `Why here` with the capabilities it spans |
 | Validator `warning: this change creates <cap>, but ...` | A new capability's change still adds a diagram to the architecture file | Review the row. Usually the diagram belongs in `specs/<cap>/diagrams.md`. The warning doesn't fail the run |
+| Validator: "decision '…' needs **Rule:** …" | An entry in `decisions.md` is missing a field | Add the Rule, Why and Source lines (Applies to is recommended) |
+| A design repeats a mistake that was fixed before | No decision was recorded when the fix was archived, or the design step didn't read the log | Add the entry to `decisions.md` now. Check that the design instruction mentions it: `openspec instructions design --change <name>` |
 | Rendered sequence diagram shows `"Name"` with quotes | Quoted participant alias | Remove the quotes (`participant A as Name`) |
 | Skills or `/opsx` commands (continue, ff, …) disappeared after `openspec update` | They weren't in the global OpenSpec profile | Add them with `openspec config profile`, then run `openspec update` again. Next time, run `openspec_preflight.py` first |
 | A tool's skills were never created | `openspec update` only refreshes tools that are already set up | `openspec init --tools <tool> .` (safe on an existing project) |

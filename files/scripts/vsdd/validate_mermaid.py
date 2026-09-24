@@ -21,6 +21,9 @@ Structure checks (active change diagrams.md files):
   - a row that adds or moves a diagram INTO specs/architecture/diagrams.md has a
     4th column, `Why here`, saying why it spans capabilities
 
+Decisions log (openspec/specs/**/decisions.md):
+  - every `## <Stable Name>` entry has **Rule:**, **Why:** and **Source:** lines
+
 Ownership warnings (active changes; printed, but they don't fail the run):
   - the change creates a capability (it has specs/<cap>/ and openspec/specs/<cap>/
     doesn't exist yet) and still adds or moves a diagram into the architecture file
@@ -245,6 +248,19 @@ def check_change_structure(path: Path, lines: list[str], root: Path, verify_befo
     return errors
 
 
+DECISION_FIELDS = ("Rule", "Why", "Source")
+
+
+def check_decisions(lines: list[str]) -> list[tuple[int, str]]:
+    """Each `## <Stable Name>` entry of a decisions log needs Rule, Why and Source."""
+    errors = []
+    for name, line_no, body in _sections(lines, "##"):
+        missing = [f for f in DECISION_FIELDS if not re.search(rf"\*\*{f}:\*\*\s*\S", body)]
+        if missing:
+            errors.append((line_no, f"decision '{name}' needs {', '.join(f'**{f}:**' for f in missing)}"))
+    return errors
+
+
 def new_capabilities(change_dir: Path, root: Path) -> list[str]:
     """Capabilities this change creates: specs/<cap>/ in the change, not yet in openspec/specs/."""
     specs = change_dir / "specs"
@@ -321,6 +337,8 @@ def main() -> int:
         for start, block in blocks:
             problems += [(path, n, msg) for n, msg in lint_block(start, block)]
             to_render.append((path, start, block))
+        if path.name == "decisions.md" and "specs" in path.parts and "changes" not in path.parts:
+            problems += [(path, n, msg) for n, msg in check_decisions(lines)]
         is_change = "changes" in path.parts and "specs" not in path.parts[path.parts.index("changes"):]
         if path.name == "diagrams.md" and is_change:
             archived = "archive" in path.parts[path.parts.index("changes"):]

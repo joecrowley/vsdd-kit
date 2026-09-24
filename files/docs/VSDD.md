@@ -4,8 +4,8 @@ Diagrams are code. They follow the same delta discipline as OpenSpec text specs:
 the current state lives in a Source of Truth, a change proposes a Before/After
 delta, and archiving merges the After state back.
 
-Read this file when you create or edit a change's `diagrams.md`, or when you archive
-a change. Read `docs/MERMAID_RULES.md` before drawing any diagram.
+Read this file when you create or edit a change's `diagrams.md`, when you design a
+change (§6), or when you archive a change. Read `docs/MERMAID_RULES.md` before drawing any diagram.
 
 ## 1. Source of Truth
 
@@ -130,3 +130,30 @@ architecture-file additions give a `Why here`. Ownership warnings are printed as
 `warning:` lines and don't change the exit code.
 
 Run it after editing any `diagrams.md`. CI runs it on every push.
+
+## 6. Architecture decisions
+
+Specs record what each capability does. They don't record the general lessons behind
+a fix, such as "after a write, refresh without a loading state". Without that, the
+next change in another capability repeats the mistake. The decisions log holds those
+lessons:
+
+- **File:** `openspec/specs/architecture/decisions.md`. Each rule is one
+  `## <Stable Name>` section with **Rule:**, **Why:**, **Applies to:** and
+  **Source:** (the archived change it came from). The validator checks that Rule,
+  Why and Source are present.
+- **Design:** before writing `design.md` (or `tasks.md`, when there is no design),
+  read the log and follow every rule that applies. To break one deliberately, write
+  `Overrides: <Stable Name> - <why>` under Decisions in `design.md`.
+- **Archive:** if the change fixed a bug caused by a pattern that could recur, or set
+  a convention, the agent drafts an entry and **asks** before adding it. If the
+  design overrode a rule, it asks whether to update or retire that entry. The archive
+  summary has a **Decisions** line.
+- **Pitfalls in context:** copy the one to three costliest rules, one line each, into
+  `context:` in `openspec/config.yaml`. That text reaches every artifact, even when
+  an agent skips the file.
+- **Upkeep:** keep entries short, and delete a rule when the code no longer has the
+  problem it guards against. A stale rule misleads as much as a missing one.
+
+Whether a design follows a rule is a judgement call, so there is no mechanical check.
+Review `design.md` for the rules that apply, and look for `Overrides:` lines.

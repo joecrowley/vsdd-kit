@@ -55,6 +55,9 @@ flowchart LR
 4. **Merge on archive.** Each Placement row is applied: sections are replaced,
    appended, moved between files (for example into a new capability's own
    `diagrams.md`) or removed. Nothing without a row is touched.
+5. **Lessons kept.** When a fix reveals a pattern that could recur, the archive step
+   proposes a rule for `openspec/specs/architecture/decisions.md`. Later designs read
+   that log first, so the same mistake isn't repeated in another capability.
 
 A change's `diagrams.md`:
 

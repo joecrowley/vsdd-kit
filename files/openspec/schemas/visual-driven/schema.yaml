@@ -238,6 +238,12 @@ artifacts:
       - **Open Questions**: Outstanding decisions or unknowns to resolve
 
 
+      Architecture decisions (VSDD): before choosing an approach, read
+      `openspec/specs/architecture/decisions.md` if it exists. Follow every rule
+      whose "Applies to" matches this change. If the design deliberately breaks
+      one, say so under Decisions as `Overrides: <Stable Name> - <why>`.
+
+
       Focus on architecture and approach, not line-by-line implementation.
 
       Reference the proposal for motivation and specs for requirements.

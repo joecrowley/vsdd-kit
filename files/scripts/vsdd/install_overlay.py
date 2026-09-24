@@ -6,7 +6,7 @@ each configured AI tool (.claude/, .opencode/, .qwen/, .cursor/, ...). Stock
 files know nothing about diagrams, and `openspec update` overwrites any edits.
 This script re-applies the VSDD additions:
 
-  skills   - inserts diagram steps into openspec-{propose,continue-change,
+  skills   - inserts diagram and decisions-log steps into openspec-{propose,continue-change,
              ff-change,update-change,apply-change,verify-change,
              archive-change,bulk-archive-change} at anchor lines. Idempotent: each insertion
              carries a `<!-- vsdd:<id> -->` marker and is skipped if present.
@@ -50,6 +50,13 @@ GEN_DIAGRAMS = """\
 - Read `docs/MERMAID_RULES.md` before drafting any diagram. Then run
   `python3 scripts/vsdd/validate_mermaid.py`: it checks the Placement table and
   that the Before copies are verbatim.
+"""
+
+GEN_DECISIONS = """\
+- Before writing design.md (or tasks.md, when the change has no design), read
+  `openspec/specs/architecture/decisions.md` if it exists and follow every rule
+  that applies. To break one deliberately, write `Overrides: <Stable Name> - <why>`
+  under Decisions in design.md. <!-- vsdd:gen-decisions -->
 """
 
 PROPOSE_LIST = """\
@@ -125,11 +132,32 @@ ARCHIVE_SYNC = """\
      `**Diagrams:**` line in the final summary.
 """
 
+ARCHIVE_DECISIONS = """\
+<!-- vsdd:archive-decisions -->
+4b. **Record architecture decisions (VSDD)**
+
+   Ask: does this change teach a rule that other changes must follow? Typical cases:
+   a bug fix whose cause is a pattern that could recur elsewhere (for example a
+   loading state emitted after a write), or a new convention set in design.md.
+   - If yes: draft an entry for `openspec/specs/architecture/decisions.md`
+     (create the file with a `# Architecture Decisions` header if needed):
+     `## <Stable Name>`, then **Rule:**, **Why:**, **Applies to:** and
+     **Source:** `<the archived change folder name>`. Show it and **ask the user**
+     before adding it. Keep it to a few lines.
+   - If the change's design.md has `Overrides: <Stable Name>`, ask whether that
+     entry should be updated or retired.
+   - Otherwise do nothing. Include a `**Decisions:**` line in the final summary
+     (added, updated, retired, or none).
+"""
+
 ARCHIVE_GUARDRAIL = """\
 - VSDD: diagram merges are section-targeted by stable name, a NO gate is always a no-op, and the summary must include a Diagrams line <!-- vsdd:archive-guardrail -->"""
 
 UPDATE_GUARDRAIL = """\
 - VSDD: when revising `diagrams.md`, never edit `## Before State` (it is a verbatim Source of Truth snapshot), keep `### <Stable Name>` headings unchanged, keep the `## Placement` table in step with the Before and After sections, re-check the `## Diagram needed?` gate if the scope changed, and keep the After State consistent with the revised proposal, specs and design. Read `docs/VSDD.md` first <!-- vsdd:update-guardrail -->"""
+
+BULK_DECISIONS = """\
+- VSDD: for EACH change, also perform the decisions step (4b of the `openspec-archive-change` skill); collect the proposed entries and ask the user once, before archiving the batch <!-- vsdd:bulk-decisions -->"""
 
 BULK_GUARDRAIL = """\
 - VSDD: before moving EACH change to the archive, perform the diagram sync described in the `openspec-archive-change` skill (step 4a) for that change, in archive order <!-- vsdd:bulk-guardrail -->"""
@@ -147,12 +175,15 @@ class Patch:
 PATCHES: dict[str, list[Patch]] = {
     "openspec-propose": [
         Patch("propose-list", (r"^- proposal\.md\b",), "after", PROPOSE_LIST, required=False),
+        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS),
         Patch("gen-diagrams", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DIAGRAMS),
     ],
     "openspec-continue-change": [
+        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS),
         Patch("gen-diagrams", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DIAGRAMS),
     ],
     "openspec-ff-change": [
+        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS),
         Patch("gen-diagrams", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DIAGRAMS),
     ],
     "openspec-update-change": [
@@ -167,10 +198,12 @@ PATCHES: dict[str, list[Patch]] = {
     ],
     "openspec-archive-change": [
         Patch("archive-sync", (r"^\d+\.\s+\*\*Perform the archive",), "before", ARCHIVE_SYNC),
+        Patch("archive-decisions", (r"^\d+\.\s+\*\*Perform the archive",), "before", ARCHIVE_DECISIONS),
         Patch("archive-guardrail", (r"^\*\*Guardrails\*\*\s*$",), "after", ARCHIVE_GUARDRAIL),
     ],
     "openspec-bulk-archive-change": [
         Patch("bulk-guardrail", (r"^\*\*Guardrails\*\*\s*$",), "after", BULK_GUARDRAIL),
+        Patch("bulk-decisions", (r"^\*\*Guardrails\*\*\s*$",), "after", BULK_DECISIONS),
     ],
 }
 

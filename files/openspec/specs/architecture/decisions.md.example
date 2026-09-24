@@ -1,0 +1,20 @@
+# Architecture Decisions
+
+Cross-cutting rules this project has learned, usually from a fix. Read this file
+before writing a change's design.md (or tasks.md, when the change has no design).
+A design that breaks a rule must say so under `## Decisions` in its design.md:
+`Overrides: <Stable Name> - <why>`.
+
+Each rule is one `## <Stable Name>` section with Rule, Why, Applies to and Source.
+Keep entries short. Retire an entry (delete it) when the code no longer has the
+problem it guards against, and say so in the archive summary of that change.
+
+## Silent Refresh After Writes
+
+- **Rule:** after a write (create, update, delete), refresh the list without
+  emitting a loading state. Keep showing the current data, and replace it when the
+  new data arrives. On failure, keep the current data and show an error message.
+- **Why:** a loading state drops the current item, so a detail screen watching it
+  flashes "not found" until the reload finishes.
+- **Applies to:** every state holder that reloads data after a mutation.
+- **Source:** <archived change name, e.g. 2026-01-15-fix-detail-flicker>
