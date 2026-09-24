@@ -6,6 +6,9 @@
 **merges it into a canonical diagram Source of Truth**. Diagrams get the same delta
 discipline as specs.
 
+**Why bother?** See [The Case for VSDD](docs/WHY_VSDD.md): the problem, the benefits,
+the costs, objections, and how to tell whether it's working.
+
 The kit is designed to be **installed by your AI coding agent**. Point Claude Code,
 OpenCode, Qwen Code, Codex, Cursor or similar at [`SETUP.md`](SETUP.md), and it
 installs, configures, seeds and verifies everything.
@@ -201,6 +204,7 @@ OpenSpec, and checks 23 conditions:
 vsdd-kit/
 ├── README.md                    ← this file
 ├── SETUP.md                     ← runbook for the AI agent
+├── docs/WHY_VSDD.md             ← the case for adopting VSDD
 ├── docs/concept-report.md       ← background: the research and concept behind VSDD
 ├── tests/smoke_test.sh          ← end-to-end test
 └── files/                       ← mirrors the target project layout
@@ -230,6 +234,8 @@ skill format and should work. If a stock skill's text differs, the overlay repor
   named symbols. It is not a static analyser.
 
 ## Background
+
+- [`docs/WHY_VSDD.md`](docs/WHY_VSDD.md) makes the case for adopting VSDD: the problem, benefits, costs, objections, adoption phases and success measures.
 
 [`docs/concept-report.md`](docs/concept-report.md) is the concept and research report
 that motivated VSDD: diagram drift, diagram-first prompting, LLM Mermaid failure modes,
