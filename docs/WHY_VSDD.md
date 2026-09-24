@@ -85,9 +85,12 @@ flowchart LR
 4. **Merge on archive.** The After State replaces the matching sections of the
    canonical diagrams. The Before/After pair and the Deviations note stay in the
    archive as history.
+5. **Keep the lesson.** When a fix reveals a pattern that could recur, the archive
+   step proposes a one-rule entry for a decisions log, which later designs read first.
 
-The kit makes this practical: an agent-driven installer, a skill overlay that
-survives OpenSpec upgrades, and a validator that keeps LLM-written Mermaid parseable.
+The kit makes this practical: a one-shot installer (the agent does only the judgement
+steps), a skill overlay that survives OpenSpec upgrades, and a validator that keeps
+LLM-written Mermaid parseable and diagrams in the capability they describe.
 
 ---
 
@@ -143,7 +146,21 @@ Deviations notes are the underrated part. Most documentation records the plan. V
 records **the plan, what was actually built, and the constraint that forced the
 difference**. That is the knowledge that usually leaves the team when someone does.
 
-### 3.5 Faster onboarding
+### 3.5 Lessons that outlive the fix
+
+Specs record what each capability does. They don't record the general lesson behind a
+fix. So an agent building the next feature in another capability repeats the mistake
+the team fixed last month, because nothing it reads mentions it. In a VSDD test run,
+exactly that happened: a list-refresh bug fixed for one action reappeared, line for
+line, in the next feature that wrote data.
+
+The decisions log is VSDD's answer. It's a short file of rules, each with the reason
+and the change it came from. The archive step proposes an entry when a fix reveals a
+pattern that could recur, and asks before adding it. The design step reads the log
+first, and a design that breaks a rule has to say so. It turns "we learned this the
+hard way" into something the next agent session actually sees.
+
+### 3.6 Faster onboarding
 
 A new engineer, human or AI, can read the current structure in the
 Source of Truth diagrams in minutes, and trust that it matches the code. The same
@@ -161,6 +178,7 @@ a session, which costs far fewer tokens than reading the source.
 | **LLM Mermaid errors** | LLMs often produce Mermaid that won't parse, especially large diagrams | `MERMAID_RULES.md` restricts diagrams to syntax LLMs handle reliably, and the validator (plus `--render` in CI) catches the rest |
 | **Process discipline** | A hotfix that bypasses `/opsx` leaves the diagrams stale | The diagrams are checked against the code at the next change that touches that area, and drift appears as a Deviations note or a Diagram Fidelity warning |
 | **Tool maintenance** | `openspec update` wipes customisations | The overlay re-applies in one command, and `install_overlay.py --check` in CI catches a forgotten run |
+| **Decisions log upkeep** | A stale rule misleads as much as a missing one | Entries are short and name their source change, so a reviewer can judge whether one still applies. The archive step asks before adding or retiring one |
 | **Baseline effort** | Each area of the system needs an initial diagram before its first delta | The installer seeds the cross-cutting diagrams from the code. Other areas get theirs the first time a change touches them |
 
 The honest summary: VSDD adds friction **only** where structure changes, and structure
@@ -251,6 +269,7 @@ Measure a few things during the pilot, rather than debating in the abstract:
 | **Structural issues caught early** | Count review comments on `diagrams.md` that changed the design | More than zero. Each one is a problem found before the code existed |
 | **Share of YES gates** | YES gates as a share of all archived changes | No fixed target. As a starting heuristic, expect a minority of changes, perhaps 20–40%. Nearly all YES suggests the gate is too strict, and nearly all NO suggests it's being dodged. Calibrate for your codebase |
 | **Deviations recorded** | Archived YES changes that have a Deviations note | Some, not all. None at all suggests the check against the code isn't really happening |
+| **Repeated mistakes** | Bugs whose cause was fixed before, in another place | Rare, and each one gets a decisions entry. A repeat despite an entry means the log isn't reaching the design step |
 | **Review cost** | Time to review `diagrams.md` | A few minutes. More than 15 suggests the diagrams are too big, so split them |
 | **Onboarding** | Ask a new engineer or a fresh agent session to explain one area, using only the diagrams | Their explanation matches the code |
 
