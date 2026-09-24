@@ -1,0 +1,42 @@
+# Architecture Diagrams
+
+Cross-cutting, system-wide diagrams for <PROJECT_NAME>. Each `## <Stable Name>`
+section is a merge target for archived OpenSpec changes. Keep the names stable.
+
+## Module Hierarchy
+
+Dependency direction between the application's top-level modules or packages.
+Arrows point from the dependent module to its dependency.
+
+```mermaid
+flowchart TD
+    APP["app - entry point"] --> UI["ui - presentation"]
+    APP --> DATA["data - repository implementations"]
+    UI --> DOMAIN["domain - entities, interfaces, use cases"]
+    DATA --> DOMAIN
+    DOMAIN --> CORE["core - shared utilities"]
+```
+
+## End-to-End Data Flow
+
+How a typical user action travels from the UI to the backend and back.
+
+```mermaid
+sequenceDiagram
+    actor U as User
+    participant V as View
+    participant S as State holder
+    participant R as Repository
+    participant B as Backend API
+    U->>V: action
+    V->>S: dispatch intent
+    activate S
+    S->>R: fetch or update
+    activate R
+    R->>B: HTTP request
+    B-->>R: response
+    deactivate R
+    R-->>S: result
+    S-->>V: new state
+    deactivate S
+```

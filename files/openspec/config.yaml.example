@@ -1,0 +1,28 @@
+schema: visual-driven
+
+# OpenSpec 1.2.x reads exactly two project-level keys: `context` and `rules`.
+# Any other key (e.g. `prompts:`) is silently ignored.
+# Verify with: openspec instructions diagrams --change <name>
+#   -> look for <project_context> and <rules> blocks in the output.
+
+# Injected into every artifact. Keep it short: stack, layout, key conventions.
+context: |
+  <PROJECT_NAME>: <one-sentence description>.
+  Stack: <languages, frameworks, state management, backend, infra>.
+  Layout: <top-level modules/packages and what they own>.
+  Conventions: <error handling, DI, testing, naming - only the ones agents get wrong>.
+
+# Per-artifact constraints. The `diagrams` rules are part of VSDD - keep them.
+# Add project rules to the other artifacts as needed.
+rules:
+  proposal:
+    - "List every module/package the change touches in the Impact section."
+  diagrams:
+    - "Read `docs/VSDD.md` and `docs/MERMAID_RULES.md` before drafting any diagram."
+    - "Snapshot the Before State verbatim from openspec/specs/<capability>/diagrams.md (cross-cutting: openspec/specs/architecture/diagrams.md); copy only the affected stable-named sections."
+    - "Keep stable section names unchanged when modifying an existing diagram - the archive merge targets sections by name."
+    - "If no visual concern is affected, record NO with a one-line reason and omit Before/After sections."
+  specs: []
+  design: []
+  tasks:
+    - "If diagrams.md has a YES gate, the final task group MUST include: trace the After State against the code and record any Deviations, then run python3 scripts/vsdd/validate_mermaid.py."

@@ -1,0 +1,41 @@
+# Copy to .github/workflows/vsdd.yml
+# Validates Mermaid diagrams in OpenSpec files and checks that the VSDD skill
+# overlay has not been wiped by `openspec update`.
+name: VSDD
+
+on:
+  push:
+    paths:
+      - "openspec/**"
+      - "docs/MERMAID_RULES.md"
+      - "scripts/vsdd/**"
+      - ".github/workflows/vsdd.yml"
+      - ".*/skills/openspec-*/**"
+      - ".*/command*/**"
+  pull_request:
+    paths:
+      - "openspec/**"
+      - "scripts/vsdd/**"
+
+jobs:
+  diagrams:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install mermaid-cli
+        run: npm install -g @mermaid-js/mermaid-cli
+
+      - name: Lint and render diagrams (Source of Truth + active changes)
+        run: python3 scripts/vsdd/validate_mermaid.py --render
+
+      - name: Check VSDD skill overlay is applied
+        run: python3 scripts/vsdd/install_overlay.py --check

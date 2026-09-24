@@ -1,0 +1,356 @@
+# VSDD Setup Runbook (for AI coding agents)
+
+You are an AI coding agent. The user has asked you to install **Visual Spec-Driven
+Development (VSDD)** into a project. VSDD extends OpenSpec so that every change
+records a Before/After Mermaid delta, and archiving merges the After state into a
+canonical diagram Source of Truth. Follow this runbook top to bottom.
+
+## Rules for executing this runbook
+
+1. Run the steps **in order**. Each step ends with a **Verify** block. Do not start
+   the next step until Verify passes.
+2. If a Verify fails twice, **stop** and report to the user: the step, the command,
+   its output, and what you tried.
+3. **Never overwrite** a file that already exists in the target unless the step
+   says so. Where a step says to ASK, ask the user and wait for the answer.
+4. Only the steps marked **ASK** need user input. Make every other decision
+   yourself and report it at the end.
+5. Record what you do. The final step asks for a summary.
+
+## Variables
+
+| Name | Meaning |
+|---|---|
+| `KIT` | The directory containing this `SETUP.md`. Its files are under `KIT/files/`. |
+| `ROOT` | The target project's root, where the setup is installed. Run commands from `ROOT`. |
+| `TOOLS` | The AI tools the team uses, as OpenSpec tool ids: `claude`, `opencode`, `qwen`, `cursor`, `codex`, `github-copilot`, `windsurf`, `gemini`, ... (full list: `openspec init --help`). |
+
+---
+
+## Step 0 — Preflight
+
+Run and record the results:
+
+```bash
+git -C "$ROOT" status --porcelain | head
+openspec --version
+python3 --version
+node --version; mmdc --version
+ls -d "$ROOT"/openspec "$ROOT"/.claude "$ROOT"/.opencode "$ROOT"/.qwen "$ROOT"/.cursor "$ROOT"/.github 2>/dev/null
+```
+
+Decide:
+
+- **Uncommitted changes** in `ROOT`: **ASK** whether to continue. Recommend
+  committing first so the whole setup can be reviewed as one diff.
+- **`openspec` missing or older than 1.2.0**: **ASK** the user to install or upgrade
+  it (`npm install -g @fission-ai/openspec@latest`), then re-run the check. Do not
+  install global packages yourself without permission.
+- **`python3` missing or older than 3.9**: stop. The kit scripts need it.
+- **`mmdc` missing**: continue. Rendering checks are optional locally (the linter
+  still runs), and CI installs mermaid-cli itself.
+- **Choosing `TOOLS`**: tool folders that already exist (`.claude`, `.opencode`,
+  `.qwen`, ...) are strong hints. **ASK** the user to confirm the list.
+
+**Detect an earlier VSDD install:**
+
+```bash
+ls "$ROOT"/openspec/schemas/visual-driven 2>/dev/null
+grep -rl "vsdd:" "$ROOT"/.*/skills/openspec-*/SKILL.md 2>/dev/null | head -3
+grep -rli "diagram" "$ROOT"/.*/skills/openspec-*/SKILL.md 2>/dev/null | head -3
+```
+
+| Finding | Meaning | Action |
+|---|---|---|
+| Nothing found | Fresh install | Continue |
+| `vsdd:` markers found | This kit is already installed | Treat as an upgrade. Steps are idempotent |
+| "diagram" found but no `vsdd:` markers | Skills were **hand-edited** for diagrams | Follow **Step 1b** before Step 5, or the steps will be duplicated |
+
+**Verify:** you have values for `ROOT` and `TOOLS`, `openspec --version` is ≥ 1.2.0,
+and `python3` works.
+
+---
+
+## Step 1 — Initialise or update OpenSpec
+
+- **No `ROOT/openspec/` directory:**
+
+  ```bash
+  openspec init --tools <TOOLS comma-separated> "$ROOT"
+  ```
+
+- **`ROOT/openspec/` exists:** run `openspec update "$ROOT"`. This regenerates the
+  stock skills and commands for the configured tools and **overwrites any edits to
+  them**. The overlay in Step 5 re-applies the VSDD additions. If you found
+  hand-edited skills in Step 0, do Step 1b **first**.
+
+### Step 1b — Hand-edited skills (only if Step 0 found them)
+
+1. Back them up: `mkdir -p "$ROOT"/.vsdd-backup && cp -R "$ROOT"/.<tool>/skills "$ROOT"/.vsdd-backup/<tool>-skills`
+   for each tool directory.
+2. Diff each hand-edited skill against a stock copy. To get one, run
+   `openspec init --tools <tool> <tmpdir>` in an empty temporary git repo. List
+   every customisation that is **not** diagram-related.
+3. **ASK** the user whether those non-diagram customisations should be kept. If yes,
+   re-apply them by hand after Step 5.
+4. Run `openspec update --force "$ROOT"` to restore stock skills.
+
+**Verify:**
+
+```bash
+openspec list            # runs without error
+ls "$ROOT"/.*/skills/ | grep openspec-   # stock skills exist for each tool
+```
+
+---
+
+## Step 2 — Copy the kit files
+
+Copy each file below. **Existing files:** follow the "If it exists" column.
+
+| From `KIT/files/` | To `ROOT/` | If it exists |
+|---|---|---|
+| `openspec/schemas/visual-driven/` (whole dir) | `openspec/schemas/visual-driven/` | Overwrite. It belongs to the kit |
+| `docs/MERMAID_RULES.md` | `docs/MERMAID_RULES.md` | Diff first. Keep any project-specific rules the user added, and merge in kit additions |
+| `docs/VSDD.md` | `docs/VSDD.md` | Overwrite. It belongs to the kit |
+| `scripts/vsdd/validate_mermaid.py` | `scripts/vsdd/validate_mermaid.py` | Overwrite |
+| `scripts/vsdd/install_overlay.py` | `scripts/vsdd/install_overlay.py` | Overwrite |
+
+```bash
+mkdir -p "$ROOT"/openspec/schemas "$ROOT"/docs "$ROOT"/scripts/vsdd
+cp -R "$KIT"/files/openspec/schemas/visual-driven "$ROOT"/openspec/schemas/
+cp "$KIT"/files/docs/VSDD.md "$ROOT"/docs/
+cp "$KIT"/files/scripts/vsdd/*.py "$ROOT"/scripts/vsdd/
+[ -e "$ROOT"/docs/MERMAID_RULES.md ] || cp "$KIT"/files/docs/MERMAID_RULES.md "$ROOT"/docs/
+```
+
+If the project keeps docs somewhere other than `docs/`, **ASK** before relocating.
+The schema, the overlay and the snippets all refer to `docs/VSDD.md` and
+`docs/MERMAID_RULES.md`, so every one of those references would need changing.
+
+**Verify:**
+
+```bash
+cd "$ROOT" && openspec schema validate visual-driven    # "Schema 'visual-driven' is valid"
+openspec schemas | grep visual-driven
+```
+
+---
+
+## Step 3 — Configure `openspec/config.yaml`
+
+OpenSpec 1.2.x reads only two project keys: **`context`** (injected into every
+artifact) and **`rules`** (per-artifact constraints). **Any other key, such as
+`prompts:`, is silently ignored.**
+
+- **No `config.yaml` yet:** copy `KIT/files/openspec/config.yaml.example` to
+  `ROOT/openspec/config.yaml`. Then fill in `context:` from the project itself:
+  read the README, the package manifests (`package.json`, `pubspec.yaml`,
+  `pyproject.toml`, `go.mod`, ...) and the top-level directory layout. Keep it to
+  4–8 lines of facts agents need. Don't invent conventions you can't see in the
+  code.
+- **`config.yaml` exists:**
+  1. Set `schema: visual-driven`.
+  2. If it has a `prompts:` key, it has been ignored. **ASK** whether to rename it to
+     `rules:`, and show the user its contents first: enabling stale rules can do more
+     harm than having none.
+  3. Add the `rules.diagrams` list from the example, if it isn't already there.
+  4. Add the `rules.tasks` VSDD line.
+  5. Add `context:` if it's missing, filled in as above.
+
+**Verify** with a throwaway change (it is removed in Step 8):
+
+```bash
+openspec new change vsdd-smoke-test
+openspec instructions diagrams --change vsdd-smoke-test | grep -E "<project_context>|<rules>|MERMAID_RULES"
+```
+
+All three patterns must appear. If `<rules>` is missing, the YAML key is wrong or
+the indentation is broken.
+
+---
+
+## Step 4 — Agent instruction files
+
+1. **`AGENTS.md`:**
+   - If `ROOT/AGENTS.md` exists and already has a
+     `## OpenSpec & Visual Spec-Driven Development` section: replace that section
+     with `KIT/files/agents/AGENTS.vsdd.md`.
+   - If it exists without one: append the snippet at the end.
+   - If there is no `AGENTS.md`: create one from the snippet, preceded by a one-line
+     project description.
+   - If `AGENTS.md` contains older, longer diagram rules (for example an
+     "OpenSpec & Diagram Standards" section): **ASK** before removing them. The
+     snippet plus `docs/VSDD.md` replaces them.
+2. **Claude Code** (`claude` in `TOOLS`): Claude Code reads `CLAUDE.md`, not
+   `AGENTS.md`. If there is no `ROOT/CLAUDE.md`, copy
+   `KIT/files/agents/CLAUDE.md.example` to `ROOT/CLAUDE.md`. It contains a single
+   line that imports `AGENTS.md`. If `CLAUDE.md` exists, check whether it already
+   contains `@AGENTS.md`, and add that line at the top if not.
+3. **Other tools:** Codex, OpenCode, Cursor, Qwen Code and most others read
+   `AGENTS.md` directly. Nothing more to do.
+
+**Verify:** `grep -n "docs/VSDD.md" "$ROOT"/AGENTS.md` prints a line. If Claude Code
+is in `TOOLS`, `grep -n "@AGENTS.md" "$ROOT"/CLAUDE.md` prints a line too.
+
+---
+
+## Step 5 — Apply the skill and command overlay
+
+```bash
+cd "$ROOT" && python3 scripts/vsdd/install_overlay.py --dry-run
+python3 scripts/vsdd/install_overlay.py
+```
+
+What it does, for every tool folder (`.claude`, `.opencode`, `.qwen`, ...):
+
+- Inserts marked VSDD blocks into these skills: `openspec-propose`, `-continue-change`,
+  `-ff-change` (diagram generation), `-apply-change` (trace the After state against
+  the code), `-verify-change` (Diagram Fidelity), `-archive-change` (merge into the
+  Source of Truth), and `-bulk-archive-change`.
+- Rewrites the matching `/opsx` command files as thin wrappers that load the skill.
+  Stock commands contain their **own copy** of the skill text, so without this step
+  the commands would bypass the VSDD steps.
+
+**If it prints `anchor not found`:** your OpenSpec version changed the stock skill
+text. Open `scripts/vsdd/install_overlay.py` and find the `PATCHES` table and the
+text constants above it. For each missing patch id, insert the block by hand at the
+equivalent place in that skill. Keep the `<!-- vsdd:<id> -->` marker line so that
+later runs detect it. Then re-run the script until it reports no problems.
+
+If you did Step 1b and the user wanted to keep non-diagram customisations, re-apply
+them now.
+
+**Verify:**
+
+```bash
+python3 scripts/vsdd/install_overlay.py --check      # ends with "VSDD overlay OK."
+```
+
+---
+
+## Step 6 — Seed the diagram Source of Truth
+
+VSDD needs a baseline, otherwise every Before state is empty. Build it from the
+**real code**, not from the example's placeholders.
+
+1. Create `ROOT/openspec/specs/architecture/diagrams.md`, using
+   `KIT/files/openspec/specs/architecture/diagrams.md.example` for structure only.
+2. Write **2–4** diagrams for the most important cross-cutting concerns:
+   - **Module Hierarchy** (`flowchart TD`): from the package manifests and imports.
+   - **End-to-End Data Flow** (`sequenceDiagram`): one representative user action,
+     traced through the real classes or functions.
+   - A **state machine** (`stateDiagram-v2`) for the most central stateful component,
+     if there is one.
+   - **System Topology** (`flowchart LR`): if there is backend or infrastructure code
+     (IaC, Docker, serverless configs).
+3. Use actual names from the code, and search for each participant or node to
+   confirm it exists. A wrong baseline is worse than none.
+4. **ASK** the user whether to also seed capability-level diagrams
+   (`openspec/specs/<capability>/diagrams.md`) for 1–3 high-traffic capabilities.
+   Only do so if `openspec/specs/<capability>/` already exists.
+5. Follow `docs/MERMAID_RULES.md` exactly.
+
+**Verify:**
+
+```bash
+python3 scripts/vsdd/validate_mermaid.py            # "OK: ... 0 problems"
+python3 scripts/vsdd/validate_mermaid.py --render   # if mmdc is installed
+```
+
+---
+
+## Step 7 — CI (optional)
+
+**ASK** whether to add CI. If the project uses GitHub Actions (`ROOT/.github/`
+exists) and the user agrees, copy `KIT/files/ci/github/vsdd.yml` to
+`ROOT/.github/workflows/vsdd.yml`. It lints and renders diagrams, and fails if an
+`openspec update` has wiped the overlay.
+
+For other CI systems, add a job that runs:
+
+```bash
+npm install -g @mermaid-js/mermaid-cli
+python3 scripts/vsdd/validate_mermaid.py --render
+python3 scripts/vsdd/install_overlay.py --check
+```
+
+**Verify:** the workflow file is valid YAML
+(`python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" .github/workflows/vsdd.yml`,
+if PyYAML is available). The first real run happens on the next push.
+
+---
+
+## Step 8 — End-to-end smoke test
+
+Use the `vsdd-smoke-test` change created in Step 3.
+
+1. Write `openspec/changes/vsdd-smoke-test/diagrams.md` as a **YES** gate that
+   modifies one Source of Truth diagram from Step 6:
+   - `## Diagram needed?` → `YES - smoke test`
+   - `## Before State` → `### <Stable Name>`, copied verbatim
+   - `## After State` → the same `### <Stable Name>` with one added node
+2. Run `python3 scripts/vsdd/validate_mermaid.py`. It must report 0 problems.
+3. Break it deliberately: delete the flowchart direction or add a `;`, and re-run. It
+   **must** report the problem. Then undo the change.
+4. **Do not archive** the smoke test. Delete it: `rm -rf openspec/changes/vsdd-smoke-test`.
+5. Confirm that `git status` shows no changes under `openspec/specs/` other than your
+   Step 6 files.
+
+**Verify:** each check above behaved as described.
+
+---
+
+## Step 9 — Report to the user
+
+Reply with:
+
+```markdown
+## VSDD installed
+- OpenSpec <version>, tools: <TOOLS>
+- Schema: visual-driven (validated)
+- Config: context + rules (<created | updated - note if `prompts:` was renamed>)
+- Agent files: <AGENTS.md created/updated>, <CLAUDE.md created/updated/n.a.>
+- Overlay: <N> skills patched, <M> commands wrapped (check: OK)
+- Source of Truth: <files and stable section names>
+- CI: <added .github/workflows/vsdd.yml | skipped | instructions given>
+- Smoke test: passed, removed
+- Decisions I made: <list>
+- Needs your attention: <anything skipped, failed, or deferred>
+
+Next: try `/opsx:propose <small change with a visual impact>` and review its diagrams.md.
+```
+
+Then suggest the user commit everything as a single commit, for example
+`chore: install visual spec-driven development (VSDD)`. Do not commit unless asked.
+
+---
+
+## Maintenance (tell the user)
+
+| Event | Action |
+|---|---|
+| `openspec update` or `openspec init` was run | `python3 scripts/vsdd/install_overlay.py`. CI's `--check` catches a forgotten run |
+| OpenSpec upgraded to a new minor or major version | Run the overlay with `--dry-run` first. On `anchor not found`, see Step 5 |
+| A new AI tool is added | `openspec update` (after adding the tool via `openspec init --tools`), then the overlay |
+| Kit upgraded | Re-run Steps 2, 4 and 5. They are idempotent |
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `openspec instructions diagrams` shows no `<rules>` | `config.yaml` uses `prompts:` or has a YAML indentation error | Use `rules:`. Check with `python3 -c "import yaml;print(yaml.safe_load(open('openspec/config.yaml')))"` |
+| Change created without `diagrams.md` | Change made with a different schema | `cat openspec/changes/<name>/.openspec.yaml` should show `schema: visual-driven`. Check `schema:` in `config.yaml` |
+| Archive summary has no `Diagrams:` line | Stock command or skill used (overlay wiped) | `install_overlay.py --check`, then re-apply |
+| Archive reports "Diagrams: no-op" on a YES gate | After State uses `##` instead of `### <Stable Name>` | Fix the headings and merge by hand. The validator flags this |
+| Rendered sequence diagram shows `"Name"` with quotes | Quoted participant alias | Remove the quotes (`participant A as Name`) |
+| `openspec archive` used directly | The CLI has no diagram merge | Merge the After State by hand (see `docs/VSDD.md` §4) |
+
+## Uninstall
+
+1. Set `schema: spec-driven` in `openspec/config.yaml`, and delete the `rules.diagrams` entries.
+2. `openspec update --force` to restore stock skills and commands.
+3. Delete `openspec/schemas/visual-driven/`, `docs/VSDD.md`, `scripts/vsdd/`,
+   `.github/workflows/vsdd.yml`, and the VSDD section of `AGENTS.md`.
+4. Keep `openspec/specs/**/diagrams.md` and the archived changes. They are still
+   useful documentation.
