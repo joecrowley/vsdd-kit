@@ -15,6 +15,11 @@ a change. Read `docs/MERMAID_RULES.md` before drawing any diagram.
   state, system topology): `openspec/specs/architecture/diagrams.md`.
 - Each diagram is one `## <Stable Name>` section: a one-line description, then a
   ` ```mermaid ` block. The stable name is the merge key. Do not rename it casually.
+- **Ownership:** a diagram belongs to the capability whose behaviour it shows. It
+  goes in the architecture file only when it spans capabilities (the module
+  hierarchy, a state holder shared by several features, system topology). When a
+  change **creates a capability**, check whether any existing architecture
+  diagram now shows only that capability's behaviour. If one does, move it (§2).
 
 ## 2. The change artifact: `diagrams.md`
 
@@ -23,11 +28,33 @@ Pipeline (schema `visual-driven`): `proposal → diagrams → specs → design �
 1. **Gate.** Start with `## Diagram needed?`. Answer YES if the change affects
    navigation/routing, a state machine, data flow, infrastructure topology or a data
    schema. Otherwise write `NO - <one-line reason>` and stop.
-2. **Before State** (YES only). Copy **verbatim** only the affected sections from the
-   Source of Truth, as `### <Stable Name>`. If no Source of Truth exists yet, write
-   `No Source of Truth exists yet - this is a new diagram.`
-3. **After State.** Use the **same** stable names for modified diagrams, and a
-   **new** stable name for a new diagram.
+2. **Placement** (YES only). Add a `## Placement` table with one row per diagram
+   the change touches:
+
+   ```markdown
+   | Stable name | Source of Truth file | Action |
+   |---|---|---|
+   | Status Update Flow | specs/reading-status-update/diagrams.md | move from specs/architecture/diagrams.md |
+   | ReadingListState Machine | specs/architecture/diagrams.md | update |
+   ```
+
+   Paths are relative to `openspec/`.
+
+   | Action | Before State | After State | Archive merge |
+   |---|---|---|---|
+   | `update` | verbatim copy from the file | same stable name | replace the section |
+   | `add` | none | new stable name | append (the file is created if it doesn't exist) |
+   | `move from <old file>` | verbatim copy from the **old** file | same stable name | delete from the old file, then add to this file |
+   | `remove` | verbatim copy (kept as history) | **none** | delete the section, and the file if no diagrams are left |
+
+3. **Before State.** Copy the `## <Stable Name>` section for every update, move and
+   remove row **verbatim** from the file the row names, as `### <Stable Name>`.
+   Nothing else.
+4. **After State.** Write one `### <Stable Name>` for every update, add and move row.
+   Keep existing stable names unchanged. A removed diagram has no After section.
+
+The validator checks that the Placement table matches the Before and After sections,
+and that each Before copy is verbatim.
 
 ## 3. Deviations
 
@@ -44,19 +71,32 @@ dashed edge, with a Deviations entry explaining it.
 
 ## 4. Archive merge
 
-For each `### <Stable Name>` under `## After State`:
+```bash
+python3 scripts/vsdd/merge_diagrams.py openspec/changes/<name> --dry-run   # show the plan
+python3 scripts/vsdd/merge_diagrams.py openspec/changes/<name>             # apply it
+```
 
-| Situation | Action |
+The script is the reference implementation of the rules below:
+- It validates the change first. If any Before copy is no longer verbatim (because
+  the Source of Truth changed after the change was proposed), it writes nothing and
+  exits 1. Resolve that conflict before archiving.
+- Running it again after a merge reports "already merged".
+
+Without the script, apply the rules by hand. If the gate is NO, the merge does
+nothing. Otherwise, apply each `## Placement` row, **removals and moves out first**,
+then updates and additions:
+
+| Action | Merge |
 |---|---|
-| Name exists in the Source of Truth | Replace that `## <Stable Name>` section |
-| Name is new | Append a `## <Stable Name>` section |
-| Source of Truth file missing | Create it with a `# <Domain> Diagrams` header |
-| Gate is NO | No-op |
+| `remove` | Delete `## <Stable Name>` from the file. If the file has no `##` diagram sections left, delete the file |
+| `move from <old>` | Delete `## <Stable Name>` from `<old>` (and `<old>` itself if no diagrams are left), then add the After section to the target file: append it, or replace it if the name is already there |
+| `update` | Replace `## <Stable Name>` in the file with the After section |
+| `add` | Append the After section. If the file doesn't exist, create it with a `# <Domain> Diagrams` header |
 
-Never touch sections the After State doesn't name, and never merge
-`## Before State` or `## Deviations`. The merge cannot delete a diagram. To remove
-one, delete its section from the Source of Truth as a task in the change, and say so
-in the proposal.
+Rules for every action:
+- Never touch a section that has no Placement row.
+- Never merge `## Before State`, `## Placement` or `## Deviations`.
+- Afterwards, run the validator on the changed Source of Truth files.
 
 The merge is done by the `openspec-archive-change` skill, not by the
 `openspec archive` CLI. Always archive through the skill or the `/opsx` archive
@@ -72,5 +112,8 @@ uses another root or a registered store, the same layout applies under that root
 python3 scripts/vsdd/validate_mermaid.py            # lint + structure
 python3 scripts/vsdd/validate_mermaid.py --render   # also parse with mermaid-cli
 ```
+
+For an active change, the validator also checks the `## Placement` table against the
+Before and After sections, and that each Before copy is still verbatim.
 
 Run it after editing any `diagrams.md`. CI runs it on every push.

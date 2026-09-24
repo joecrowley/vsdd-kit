@@ -42,14 +42,17 @@ flowchart LR
 1. **Gate.** Every change's `diagrams.md` starts with `## Diagram needed?`. Bug fixes
    are usually a one-line `NO`. The answer is `YES` when navigation, a state machine,
    data flow, topology or a schema changes.
-2. **Before/After.** The Before state is copied **verbatim** from the Source of Truth.
-   The After state proposes the change under the **same stable section names**.
+2. **Placement and Before/After.** A `## Placement` table names each diagram the change
+   touches, which Source of Truth file it lives in, and the action: `update`, `add`,
+   `move from <file>` or `remove`. The Before state is copied **verbatim** from that
+   file, which the validator checks. The After state proposes the change under the
+   **same stable section names**.
 3. **Diagrams checked against the code.** During apply and verify, the agent confirms
    that every node and edge in the After state exists in the code. Where they differ,
    it corrects the diagram and records the difference in a `## Deviations` section.
-4. **Merge on archive.** Each After section replaces the section with the same name in
-   `openspec/specs/<capability>/diagrams.md`, or is appended if the name is new.
-   Nothing else in the file is touched.
+4. **Merge on archive.** Each Placement row is applied: sections are replaced,
+   appended, moved between files (for example into a new capability's own
+   `diagrams.md`) or removed. Nothing without a row is touched.
 
 A change's `diagrams.md`:
 
@@ -57,6 +60,13 @@ A change's `diagrams.md`:
 ## Diagram needed?
 
 YES - adds a discount-code step to the checkout flow
+
+## Placement
+
+| Stable name | Source of Truth file | Action |
+|---|---|---|
+| Checkout Flow | specs/checkout/diagrams.md | update |
+| Discount Validation | specs/checkout/diagrams.md | add |
 
 ## Before State
 
@@ -125,6 +135,7 @@ and Qwen).
 ```bash
 python3 scripts/vsdd/validate_mermaid.py            # lint + change structure
 python3 scripts/vsdd/validate_mermaid.py --render   # also render with mermaid-cli
+python3 scripts/vsdd/merge_diagrams.py openspec/changes/<name> --dry-run   # preview the archive merge
 python3 scripts/vsdd/install_overlay.py             # re-apply after `openspec update`
 python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay was wiped
 ```
@@ -142,7 +153,7 @@ python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay wa
 | `.<tool>/skills/openspec-*` | Stock OpenSpec skills with the VSDD steps inserted, each marked `<!-- vsdd:… -->` |
 | `openspec/config.yaml` `operations` | The key VSDD steps, repeated as CLI guidance (newer OpenSpec) |
 | `.<tool>/command*/opsx-*` | Thin wrappers that load those skills |
-| `scripts/vsdd/` | `validate_mermaid.py`, `install_overlay.py` |
+| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before), `merge_diagrams.py` (the archive merge, deterministic), `install_overlay.py` |
 | `.github/workflows/vsdd.yml` | CI: render every diagram and check the overlay (optional) |
 
 ## Design notes
@@ -204,7 +215,10 @@ OpenSpec, and checks every Verify condition:
 - schema validity, and `context`/`rules` injection
 - the `operations` backstop, when the CLI supports `instructions archive`
 - overlay apply, idempotency, command wrapping, and every patched skill for each tool
-- diagram validation, including deliberately broken cases
+- diagram validation, including deliberately broken cases: bad Mermaid, a missing or
+  inconsistent Placement table, and a Before copy that isn't verbatim
+- the archive merge: update, add, move and remove, idempotency, and refusing to merge
+  when the Source of Truth changed after the change was proposed
 - recovery after `openspec update`
 
 By default it uses an isolated OpenSpec config with **every workflow enabled**, so the
@@ -226,7 +240,7 @@ vsdd-kit/
     ├── openspec/                ← schema, templates, config example, Source of Truth skeleton
     ├── docs/                    ← VSDD.md, MERMAID_RULES.md
     ├── agents/                  ← AGENTS.md section, CLAUDE.md example
-    ├── scripts/vsdd/            ← install_overlay.py, validate_mermaid.py
+    ├── scripts/vsdd/            ← install_overlay.py, validate_mermaid.py, merge_diagrams.py
     └── ci/github/vsdd.yml       ← GitHub Actions workflow
 ```
 
@@ -243,11 +257,12 @@ skill format and should work. If a stock skill's text differs, the overlay repor
 
 ## Limitations
 
-- **Merges are carried out by the agent.** The archive merge is done by the agent
-  following the archive skill, not by the OpenSpec CLI. Running `openspec archive`
-  directly skips it.
-- **Diagrams can't be deleted through the merge.** Remove sections from the Source of
-  Truth by hand, as a task in the change.
+- **The OpenSpec CLI doesn't merge diagrams.** The archive skill does, by running
+  `merge_diagrams.py`. Running `openspec archive` directly skips the merge. Run the
+  script yourself if that happens.
+- **The Placement table is newer than some archives.** Archived changes made before
+  it existed have no table. The validator skips structure checks on archived changes
+  unless `--strict-archive` is given.
 - **Checking diagrams against the code is a best effort.** The agent searches for
   named symbols. It is not a static analyser.
 

@@ -115,6 +115,7 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 | `docs/VSDD.md` | `docs/VSDD.md` | Overwrite. It belongs to the kit |
 | `scripts/vsdd/validate_mermaid.py` | `scripts/vsdd/validate_mermaid.py` | Overwrite |
 | `scripts/vsdd/install_overlay.py` | `scripts/vsdd/install_overlay.py` | Overwrite |
+| `scripts/vsdd/merge_diagrams.py` | `scripts/vsdd/merge_diagrams.py` | Overwrite |
 
 ```bash
 mkdir -p "$ROOT"/openspec/schemas "$ROOT"/docs "$ROOT"/scripts/vsdd
@@ -303,11 +304,16 @@ Use the `vsdd-smoke-test` change created in Step 3.
 1. Write `openspec/changes/vsdd-smoke-test/diagrams.md` as a **YES** gate that
    modifies one Source of Truth diagram from Step 6:
    - `## Diagram needed?` → `YES - smoke test`
+   - `## Placement` → one row: `| <Stable Name> | specs/architecture/diagrams.md | update |`
    - `## Before State` → `### <Stable Name>`, copied verbatim
    - `## After State` → the same `### <Stable Name>` with one added node
 2. Run `python3 scripts/vsdd/validate_mermaid.py`. It must report 0 problems.
-3. Break it deliberately: delete the flowchart direction or add a `;`, and re-run. It
-   **must** report the problem. Then undo the change.
+3. Break it deliberately, and re-run after each break. It **must** report every problem.
+   Undo each break before the next:
+   - delete the flowchart direction, or add a `;`;
+   - edit one word inside the Before copy (not verbatim);
+   - change the Placement action to `remove` (a removed diagram can't have an After
+     section).
 4. **Do not archive** the smoke test. Delete it: `rm -rf openspec/changes/vsdd-smoke-test`.
 5. Confirm that `git status` shows no changes under `openspec/specs/` other than your
    Step 6 files.
@@ -348,7 +354,7 @@ Then suggest the user commit everything as a single commit, for example
 | `openspec update` or `openspec init` was run | `python3 scripts/vsdd/install_overlay.py`. CI's `--check` catches a forgotten run |
 | OpenSpec upgraded to a new minor or major version | Run the overlay with `--dry-run` first. On `anchor not found`, see Step 5 |
 | A new AI tool is added | `openspec update` (after adding the tool via `openspec init --tools`), then the overlay |
-| Kit upgraded | Re-run Steps 2, 3 (new `rules`/`operations` entries) and 4. For Step 5, first restore stock skills with `openspec update`, then run the overlay. Blocks already marked `vsdd:` are skipped, so their text only refreshes from stock |
+| Kit upgraded | Re-run Steps 2, 3 (new `rules`/`operations` entries, e.g. the Placement rule) and 4. Changes still in flight need a `## Placement` table added before they validate. For Step 5, first restore stock skills with `openspec update`, then run the overlay. Blocks already marked `vsdd:` are skipped, so their text only refreshes from stock |
 
 ## Troubleshooting
 
@@ -357,9 +363,12 @@ Then suggest the user commit everything as a single commit, for example
 | `openspec instructions diagrams` shows no `<rules>` | `config.yaml` uses `prompts:` or has a YAML indentation error | Use `rules:`. Check with `python3 -c "import yaml;print(yaml.safe_load(open('openspec/config.yaml')))"` |
 | Change created without `diagrams.md` | Change made with a different schema | `cat openspec/changes/<name>/.openspec.yaml` should show `schema: visual-driven`. Check `schema:` in `config.yaml` |
 | Archive summary has no `Diagrams:` line | Stock command or skill used (overlay wiped) | `install_overlay.py --check`, then re-apply |
-| Archive reports "Diagrams: no-op" on a YES gate | After State uses `##` instead of `### <Stable Name>` | Fix the headings and merge by hand. The validator flags this |
+| Archive reports "Diagrams: no-op" on a YES gate | After State uses `##` instead of `### <Stable Name>`, or there's no `## Placement` table | Fix the headings or add the table, then merge by hand. The validator flags both |
+| Validator: "Before ... is not a verbatim copy" | The Before section was edited, or the Source of Truth changed after the change was proposed | Re-copy the section from the file the Placement row names. If the Source of Truth really changed, re-check that the After State still applies |
+| Validator: "... has no Placement row" | A Before or After section isn't listed in `## Placement` | Add a row (update / add / move from / remove), or delete the stray section |
 | Rendered sequence diagram shows `"Name"` with quotes | Quoted participant alias | Remove the quotes (`participant A as Name`) |
-| `openspec archive` used directly | The CLI has no diagram merge | Merge the After State by hand (see `docs/VSDD.md` §4) |
+| `openspec archive` used directly | The CLI has no diagram merge | Run `python3 scripts/vsdd/merge_diagrams.py openspec/changes/archive/<dated-name>` (see `docs/VSDD.md` §4) |
+| `merge_diagrams.py` refuses: "not a verbatim copy" | The Source of Truth changed after the change was proposed (e.g. another change archived first) | Re-copy the Before sections from the current Source of Truth, re-check that the After State still makes sense, then merge again |
 
 ## Uninstall
 

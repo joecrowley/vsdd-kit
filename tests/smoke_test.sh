@@ -112,15 +112,62 @@ EOF
 
 step "8. change validation"
 C=openspec/changes/vsdd-smoke-test/diagrams.md
-SEC="$(sed -n '/^## Module Hierarchy/,/^## End-to-End/p' openspec/specs/architecture/diagrams.md | sed '1d;$d')"
-{ printf '## Diagram needed?\n\nYES - smoke test\n\n## Before State\n\n### Module Hierarchy\n%s\n\n## After State\n\n### Module Hierarchy\n%s\n' "$SEC" "$SEC"; } > "$C"
-python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "valid YES-gate change passes" || fail "valid change rejected"
+SOT=openspec/specs/architecture/diagrams.md
+SEC="$(sed -n '/^## Module Hierarchy/,/^## End-to-End/p' $SOT | sed '1d;$d')"
+AFTER="$(printf '%s\n' "$SEC" | sed 's/^    DOMAIN --> CORE\(.*\)$/    DOMAIN --> CORE\1\n    UI --> CORE/')"
+write_change() {  # $1 = action for Module Hierarchy, $2 = include After (1/0), $3 = Before text
+  {
+    printf '## Diagram needed?\n\nYES - smoke test\n\n## Placement\n\n'
+    printf '| Stable name | Source of Truth file | Action |\n|---|---|---|\n'
+    printf '| Module Hierarchy | specs/architecture/diagrams.md | %s |\n' "$1"
+    printf '| Smoke Flow | specs/smoke-cap/diagrams.md | add |\n\n'
+    printf '## Before State\n\n### Module Hierarchy\n%s\n\n## After State\n\n' "$3"
+    [ "$2" = 1 ] && printf '### Module Hierarchy\n%s\n\n' "$AFTER"
+    printf '### Smoke Flow\nSmoke test flow.\n\n```mermaid\nflowchart LR\n    S["smoke"] --> T["test"]\n```\n'
+  } > "$C"
+}
+write_change update 1 "$SEC"
+python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "valid YES-gate change (update + add) passes" || fail "valid change rejected"
 sed -i.bak 's/^flowchart TD$/flowchart/' "$C" && rm -f "$C.bak"
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && fail "missing direction not caught" || pass "missing flowchart direction caught"
+write_change update 1 "$(printf '%s\n' "$SEC" | sed 's/^Dependency direction/Dependency-direction/')"
+grep -q "not a verbatim copy" <<<"$(python3 scripts/vsdd/validate_mermaid.py 2>&1 || true)" && pass "non-verbatim Before caught" || fail "non-verbatim Before not caught"
+write_change remove 1 "$SEC"
+grep -q "must not have an After" <<<"$(python3 scripts/vsdd/validate_mermaid.py 2>&1 || true)" && pass "remove with After section caught" || fail "remove with After not caught"
+printf '## Diagram needed?\n\nYES - x\n\n## Before State\n\n## After State\n' > "$C"
+grep -q "requires '## Placement'" <<<"$(python3 scripts/vsdd/validate_mermaid.py 2>&1 || true)" && pass "missing Placement caught" || fail "missing Placement not caught"
 printf '## Diagram needed?\n\nmaybe\n' > "$C"
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && fail "bad gate not caught" || pass "bad gate caught"
 printf '## Diagram needed?\n\nNO - smoke test\n' > "$C"
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "NO gate passes" || fail "NO gate rejected"
+
+step "8b. archive merge (merge_diagrams.py)"
+cp "$SOT" "$ROOT/sot.bak"
+write_change update 1 "$SEC"
+python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test --dry-run >/dev/null && cmp -s "$SOT" "$ROOT/sot.bak" \
+  && pass "dry run writes nothing" || fail "dry run changed files"
+python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test >/dev/null || fail "merge failed"
+grep -q "UI --> CORE" "$SOT" && pass "update merged into architecture" || fail "update not merged"
+grep -q "^## End-to-End Data Flow" "$SOT" && pass "untouched section kept" || fail "untouched section lost"
+[ -f openspec/specs/smoke-cap/diagrams.md ] && grep -q "^## Smoke Flow" openspec/specs/smoke-cap/diagrams.md \
+  && pass "add created the capability diagrams file" || fail "add did not create the file"
+python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test | grep -q "already merged" \
+  && pass "second merge is a no-op" || fail "second merge not idempotent"
+MH="$(sed -n '/^## Module Hierarchy/,/^## End-to-End/p' $SOT | sed '1d;$d')"
+{ printf '## Diagram needed?\n\nYES - move\n\n## Placement\n\n| Stable name | Source of Truth file | Action |\n|---|---|---|\n'
+  printf '| Module Hierarchy | specs/smoke-cap/diagrams.md | move from specs/architecture/diagrams.md |\n| Smoke Flow | specs/smoke-cap/diagrams.md | remove |\n\n'
+  printf '## Before State\n\n### Module Hierarchy\n%s\n\n### Smoke Flow\n%s\n\n## After State\n\n### Module Hierarchy\n%s\n' \
+    "$MH" "$(sed -n '/^## Smoke Flow/,$p' openspec/specs/smoke-cap/diagrams.md | sed '1d')" "$MH"; } > "$C"
+python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test >/dev/null || fail "move/remove merge failed"
+! grep -q "^## Module Hierarchy" "$SOT" && grep -q "^## Module Hierarchy" openspec/specs/smoke-cap/diagrams.md \
+  && ! grep -q "^## Smoke Flow" openspec/specs/smoke-cap/diagrams.md \
+  && pass "move and remove applied" || fail "move/remove not applied"
+cp "$ROOT/sot.bak" "$SOT"; rm -rf openspec/specs/smoke-cap
+write_change update 1 "$SEC"
+sed -i.bak 's/^Dependency direction/Dependency-direction/' "$SOT" && rm -f "$SOT.bak"
+python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test >/dev/null 2>&1 && fail "conflict not refused" || pass "conflict refused (Source of Truth changed after proposal)"
+cp "$ROOT/sot.bak" "$SOT"; rm -f "$ROOT/sot.bak"
+python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "Source of Truth restored and valid" || fail "restore failed"
 
 step "Maintenance: openspec update wipes overlay"
 openspec update --force . </dev/null >/dev/null 2>&1 || fail "openspec update"

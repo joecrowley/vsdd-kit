@@ -23,7 +23,8 @@ rules:
     - "List every module/package the change touches in the Impact section."
   diagrams:
     - "Read `docs/VSDD.md` and `docs/MERMAID_RULES.md` before drafting any diagram."
-    - "Snapshot the Before State verbatim from openspec/specs/<capability>/diagrams.md (cross-cutting: openspec/specs/architecture/diagrams.md); copy only the affected stable-named sections."
+    - "For a YES gate, add a `## Placement` table (Stable name | Source of Truth file | Action: update, add, move from <old file>, remove). Diagrams belong to the capability whose behaviour they show. When the change creates a capability, consider moving its flows into specs/<capability>/diagrams.md."
+    - "Copy the Before State verbatim from the file each Placement row names (for a move, the old file); copy only the affected stable-named sections."
     - "Keep stable section names unchanged when modifying an existing diagram - the archive merge targets sections by name."
     - "If no visual concern is affected, record NO with a one-line reason and omit Before/After sections."
   tasks:
@@ -37,4 +38,4 @@ operations:
       - "VSDD: if the change's diagrams.md has a YES gate, before finishing trace every participant, node and edge in its After State against the code. Where the code differs, update the After State to match and add a top-level `## Deviations` section (Proposed / Built / Why)."
   archive:
     guidance:
-      - "VSDD: before moving the change to the archive, merge its diagrams.md into the Source of Truth as described in docs/VSDD.md section 4: for each `### <Stable Name>` under `## After State`, replace the matching `## <Stable Name>` section in specs/<capability>/diagrams.md (cross-cutting: specs/architecture/diagrams.md), or append it if new. Skip if the gate is NO. Never merge Before State or Deviations. Include a Diagrams line in the archive summary."
+      - "VSDD: before moving the change to the archive, merge its diagrams.md into the Source of Truth: run python3 scripts/vsdd/merge_diagrams.py <change dir> (with --dry-run first). Without the script, apply every row of its `## Placement` table as described in docs/VSDD.md section 4 (remove, move from <old file>, update, add). Skip if the gate is NO. Never touch sections without a Placement row, and never merge Before State, Placement or Deviations. Run python3 scripts/vsdd/validate_mermaid.py afterwards, and include a Diagrams line in the archive summary."

@@ -37,14 +37,17 @@ GEN_DIAGRAMS = """\
 **VSDD - diagrams.md** (schema `visual-driven`, DAG proposal -> diagrams -> specs -> design -> tasks):
 - Decide the `## Diagram needed?` gate first. A visual concern is navigation/routing,
   a state machine, data flow, infrastructure topology, or a data schema.
-  - NO: write `NO - <one-line reason>` and stop. No Before/After sections.
-  - YES: read the owning capability's Source of Truth at
-    `openspec/specs/<capability>/diagrams.md` (cross-cutting:
-    `openspec/specs/architecture/diagrams.md`). Copy ONLY the affected
-    `## <Stable Name>` sections VERBATIM into `## Before State` as `### <Stable Name>`.
-    Propose the updated or new diagrams under `## After State` using the SAME
-    stable names (new diagram = new stable name).
-- Read `docs/MERMAID_RULES.md` before drafting any diagram.
+  - NO: write `NO - <one-line reason>` and stop. No other sections.
+  - YES: read `docs/VSDD.md` sections 1-2, then add a `## Placement` table
+    (Stable name | Source of Truth file | Action) with one row per diagram touched.
+    Action is update, add, `move from <old file>` or remove. Diagrams belong to the
+    capability whose behaviour they show. If the change creates a capability,
+    consider moving its flows into `specs/<capability>/diagrams.md`.
+  - Copy the Before sections VERBATIM from the files the rows name, then write the
+    After sections under the SAME stable names. Removed diagrams have no After.
+- Read `docs/MERMAID_RULES.md` before drafting any diagram. Then run
+  `python3 scripts/vsdd/validate_mermaid.py`: it checks the Placement table and
+  that the Before copies are verbatim.
 """
 
 PROPOSE_LIST = """\
@@ -91,21 +94,32 @@ ARCHIVE_SYNC = """\
 4a. **Sync diagrams into the Source of Truth (VSDD)**
 
    Read `diagrams.md` in the change directory (`<changeRoot>` when the CLI reports
-   one, otherwise `openspec/changes/<name>/`).
+   one, otherwise `openspec/changes/<name>/`), and `docs/VSDD.md` section 4.
    - Missing, or gate is NO: no-op. Record "Diagrams: no-op".
-   - Gate is YES: for each `### <Stable Name>` section under `## After State`:
-     - Target file: the owning capability's `specs/<capability>/diagrams.md` under the
-       planning root (default `openspec/specs/`); cross-cutting diagrams go in
-       `specs/architecture/diagrams.md`.
-     - Stable name exists as `## <Stable Name>` in the target: REPLACE that section
-       (description + mermaid block) with the After version.
-     - Stable name is new: APPEND it as a `## <Stable Name>` section.
-     - Target file does not exist: create it with a `# <Domain> Diagrams` header.
-   - Never touch sections the After State does not name. Never merge
-     `## Before State` or `## Deviations`.
-   - If `scripts/vsdd/validate_mermaid.py` exists, run it on the changed Source of
-     Truth files and fix any errors before moving the change.
-   - Show which sections were replaced or appended, and include a
+   - If `scripts/vsdd/merge_diagrams.py` exists, run it with `--dry-run` first
+     and show the plan, then run it for real:
+     `python3 scripts/vsdd/merge_diagrams.py <change dir>`. It validates the change
+     first, including that the Before copies are still verbatim, then applies the
+     Placement rows deterministically. If it refuses (exit 1), the Source of Truth
+     changed after the change was proposed: stop, show the errors, and don't archive.
+   - Without the script, gate YES: apply every `## Placement` row by hand. Paths are relative to the
+     planning root's `openspec/`. Do removals and moves out first:
+     - `remove`: delete `## <Stable Name>` from the file. Delete the file if no
+       `##` diagram sections are left.
+     - `move from <old>`: delete the section from `<old>` (and `<old>` itself if
+       it is left empty), then write the After section into the target file:
+       append it, or replace it if the name is already there.
+     - `update`: replace `## <Stable Name>` in the file with the After section.
+     - `add`: append the After section. Create the file with a
+       `# <Domain> Diagrams` header if it doesn't exist.
+   - An older change with no Placement table: merge each After section into the
+     file its Before copy came from (default `specs/architecture/diagrams.md`),
+     replacing a section with the same name or appending a new one.
+   - Never touch a section with no Placement row. Never merge `## Before State`,
+     `## Placement` or `## Deviations`.
+   - If `scripts/vsdd/validate_mermaid.py` exists, run it and fix any errors
+     before moving the change.
+   - Show which sections were replaced, appended, moved or removed, and include a
      `**Diagrams:**` line in the final summary.
 """
 
@@ -113,7 +127,7 @@ ARCHIVE_GUARDRAIL = """\
 - VSDD: diagram merges are section-targeted by stable name, a NO gate is always a no-op, and the summary must include a Diagrams line <!-- vsdd:archive-guardrail -->"""
 
 UPDATE_GUARDRAIL = """\
-- VSDD: when revising `diagrams.md`, never edit `## Before State` (it is a verbatim Source of Truth snapshot), keep `### <Stable Name>` headings unchanged, re-check the `## Diagram needed?` gate if the scope changed, and keep the After State consistent with the revised proposal, specs and design. Read `docs/VSDD.md` first <!-- vsdd:update-guardrail -->"""
+- VSDD: when revising `diagrams.md`, never edit `## Before State` (it is a verbatim Source of Truth snapshot), keep `### <Stable Name>` headings unchanged, keep the `## Placement` table in step with the Before and After sections, re-check the `## Diagram needed?` gate if the scope changed, and keep the After State consistent with the revised proposal, specs and design. Read `docs/VSDD.md` first <!-- vsdd:update-guardrail -->"""
 
 BULK_GUARDRAIL = """\
 - VSDD: before moving EACH change to the archive, perform the diagram sync described in the `openspec-archive-change` skill (step 4a) for that change, in archive order <!-- vsdd:bulk-guardrail -->"""

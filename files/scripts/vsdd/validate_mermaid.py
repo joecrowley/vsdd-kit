@@ -11,10 +11,13 @@ Lint checks (always):
 Render check (--render): parses every block with mermaid-cli (`mmdc`), which
 catches anything the linter cannot (unquoted labels, bad syntax).
 
-Structure checks (always, change diagrams.md only):
+Structure checks (active change diagrams.md files):
   - first section is `## Diagram needed?` with a YES or NO decision
-  - YES gate has `## Before State` and `## After State`
-  - After State diagrams sit under `### <Stable Name>` headings
+  - YES gate has `## Placement`, `## Before State` and `## After State`
+  - every Placement row (update / add / move from <file> / remove) matches the
+    Before and After `### <Stable Name>` sections, and vice versa
+  - Before sections are verbatim copies of the Source of Truth file the row names
+    (checked for active changes only - archived ones describe an older state)
 
 Usage:
   python3 scripts/vsdd/validate_mermaid.py                 # openspec/specs + active changes
@@ -95,35 +98,121 @@ def lint_block(start: int, block: list[str]) -> list[tuple[int, str]]:
     return errors
 
 
-def check_change_structure(path: Path, lines: list[str]) -> list[tuple[int, str]]:
-    headings = [(i, l.rstrip()) for i, l in enumerate(lines, 1) if l.startswith("#")]
-    if not headings or headings[0][1] != "## Diagram needed?":
+PLACEMENT_ACTION_RE = re.compile(r"^(update|add|remove|move from\s+(\S+))$")
+
+
+def _sections(lines: list[str], level: str) -> list[tuple[str, int, str]]:
+    """Ordered (heading text, line number, body) for headings of one level ('##', '###')."""
+    out: list[tuple[str, int, str]] = []
+    current, start, buf = None, 0, []
+    in_fence = False
+    for i, line in enumerate(lines, 1):
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+        heading = not in_fence and line.startswith("#")
+        if heading and (line.startswith(level + " ") or len(line) - len(line.lstrip("#")) <= len(level)):
+            if current is not None:
+                out.append((current, start, "\n".join(buf).strip()))
+            current, start, buf = (line[len(level) + 1:].strip(), i, []) if line.startswith(level + " ") else (None, 0, [])
+            continue
+        if current is not None:
+            buf.append(line)
+    if current is not None:
+        out.append((current, start, "\n".join(buf).strip()))
+    return out
+
+
+def _parse_placement(body: str) -> tuple[list[tuple[str, str, str, str | None]], list[str]]:
+    """Return ([(name, file, action, move_from)], [errors]) from a Placement table."""
+    rows, errors = [], []
+    for raw in body.splitlines():
+        line = raw.strip()
+        if not line.startswith("|") or set(line) <= set("|-: "):
+            continue
+        cells = [c.strip().strip("`") for c in line.strip("|").split("|")]
+        if len(cells) != 3:
+            errors.append(f"Placement row needs 3 columns: {line}")
+            continue
+        name, target, action = cells
+        if name.lower() == "stable name":
+            continue
+        m = PLACEMENT_ACTION_RE.match(action)
+        if not m:
+            errors.append(f"Placement '{name}': action must be update, add, remove or 'move from <file>'")
+            continue
+        move_from = m.group(2).strip("`") if m.group(2) else None
+        for f in (target, move_from):
+            if f and not (f.startswith("specs/") and f.endswith("diagrams.md")):
+                errors.append(f"Placement '{name}': '{f}' must be a specs/**/diagrams.md path under openspec/")
+        rows.append((name, target, m.group(1).split()[0], move_from))
+    return rows, errors
+
+
+def check_change_structure(path: Path, lines: list[str], root: Path, verify_before: bool) -> list[tuple[int, str]]:
+    h2 = {n: (ln, body) for n, ln, body in _sections(lines, "##")}
+    names = [n for n, _, _ in _sections(lines, "##")]
+    if not names or names[0] != "Diagram needed?":
         return [(1, "change diagrams.md must start with '## Diagram needed?'")]
-    gate_line = next(
-        (l for l in lines[headings[0][0]:] if l.strip() and not l.strip().startswith("<!--")),
-        "",
-    )
-    match = GATE_RE.match(gate_line)
+    gate_line_no, gate_body = h2["Diagram needed?"]
+    gate_text = next((l for l in gate_body.splitlines() if l.strip() and not l.strip().startswith("<!--")), "")
+    match = GATE_RE.match(gate_text)
     if not match:
-        return [(headings[0][0], "gate must record YES or NO")]
+        return [(gate_line_no, "gate must record YES or NO")]
     if match.group(1).upper() == "NO":
         return []
+
     errors: list[tuple[int, str]] = []
-    names = [h for _, h in headings]
-    for required in ("## Before State", "## After State"):
-        if required not in names:
-            errors.append((1, f"YES gate requires '{required}'"))
-    if "## After State" in names:
-        after_idx = names.index("## After State")
-        after_line = headings[after_idx][0]
-        next_h2 = next(
-            (ln for ln, h in headings[after_idx + 1:] if h.startswith("## ")), len(lines) + 1
-        )
-        has_stable = any(
-            h.startswith("### ") for ln, h in headings if after_line < ln < next_h2
-        )
-        if not has_stable:
-            errors.append((after_line, "After State needs '### <Stable Name>' sections"))
+    for required in ("Placement", "Before State", "After State"):
+        if required not in h2:
+            errors.append((1, f"YES gate requires '## {required}'"))
+    if errors:
+        return errors
+
+    rows, row_errors = _parse_placement(h2["Placement"][1])
+    placement_line = h2["Placement"][0]
+    errors += [(placement_line, e) for e in row_errors]
+    if not rows and not row_errors:
+        errors.append((placement_line, "Placement table has no rows"))
+
+    before_line, _ = h2["Before State"]
+    after_line, _ = h2["After State"]
+    h3 = _sections(lines, "###")
+    next_h2 = min((ln for n, (ln, _) in h2.items() if ln > after_line), default=len(lines) + 1)
+    before = {n: (ln, body) for n, ln, body in h3 if before_line < ln < after_line}
+    after = {n: (ln, body) for n, ln, body in h3 if after_line < ln < next_h2}
+
+    seen = set()
+    for name, target, action, move_from in rows:
+        if name in seen:
+            errors.append((placement_line, f"Placement lists '{name}' twice"))
+        seen.add(name)
+        needs_before = action in ("update", "move", "remove")
+        needs_after = action in ("update", "add", "move")
+        if needs_before and name not in before:
+            errors.append((before_line, f"'{name}' ({action}) needs '### {name}' under Before State"))
+        if action == "add" and name in before:
+            errors.append((before_line, f"'{name}' is 'add' but has a Before section - use update or move"))
+        if needs_after and name not in after:
+            errors.append((after_line, f"'{name}' ({action}) needs '### {name}' under After State"))
+        if action == "remove" and name in after:
+            errors.append((after_line, f"'{name}' is 'remove' and must not have an After section"))
+        if verify_before and needs_before and name in before:
+            source = move_from if action == "move" else target
+            sot = root / "openspec" / source
+            if not sot.is_file():
+                errors.append((before[name][0], f"'{name}': Source of Truth file openspec/{source} not found"))
+            else:
+                sot_sections = {n: (ln, body) for n, ln, body in _sections(sot.read_text(encoding="utf-8").splitlines(), "##")}
+                if name not in sot_sections:
+                    errors.append((before[name][0], f"'{name}' not found as '## {name}' in openspec/{source}"))
+                elif sot_sections[name][1] != before[name][1]:
+                    errors.append((before[name][0], f"Before '{name}' is not a verbatim copy of openspec/{source}"))
+    for name in after:
+        if name not in seen:
+            errors.append((after[name][0], f"After section '{name}' has no Placement row"))
+    for name in before:
+        if name not in seen:
+            errors.append((before[name][0], f"Before section '{name}' has no Placement row"))
     return errors
 
 
@@ -156,6 +245,8 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="project root (default: cwd)")
     parser.add_argument("--render", action="store_true", help="also parse each diagram with mmdc")
     parser.add_argument("--include-archive", action="store_true", help="also scan openspec/changes/archive")
+    parser.add_argument("--strict-archive", action="store_true",
+                        help="also apply the change-structure checks to archived changes (older ones predate Placement)")
     args = parser.parse_args()
 
     root = args.root.resolve()
@@ -174,7 +265,9 @@ def main() -> int:
             to_render.append((path, start, block))
         is_change = "changes" in path.parts and "specs" not in path.parts[path.parts.index("changes"):]
         if path.name == "diagrams.md" and is_change:
-            problems += [(path, n, msg) for n, msg in check_change_structure(path, lines)]
+            archived = "archive" in path.parts[path.parts.index("changes"):]
+            if not (archived and args.include_archive and not args.strict_archive):
+                problems += [(path, n, msg) for n, msg in check_change_structure(path, lines, root, not archived)]
 
     if args.render and to_render:
         problems += render_blocks(to_render)

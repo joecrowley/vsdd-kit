@@ -59,15 +59,29 @@ artifacts:
       Before/After sections.
 
 
-      Step 3 - If YES:
-      - Identify the owning capability's Source of Truth at
-      `openspec/specs/<capability>/diagrams.md` (cross-cutting concerns use
-      `openspec/specs/architecture/diagrams.md`).
-      - `## Before State`: copy VERBATIM only the affected stable-named
-      `## <Stable Name>` sections from the Source of Truth. If the Source of
-      Truth does not exist yet, state that and leave the section empty.
-      - `## After State`: propose the updated (or new) diagrams using the same
-      stable section names. New diagrams get a new stable name.
+      Step 3 - If YES, decide placement and record it in `## Placement` (a table:
+      Stable name | Source of Truth file | Action), one row per diagram touched:
+      - Source of Truth files live under openspec/: capability-owned diagrams in
+      `specs/<capability>/diagrams.md`, cross-cutting ones in
+      `specs/architecture/diagrams.md`. A diagram belongs to the capability whose
+      behaviour it shows.
+      - If this change CREATES a capability, decide whether its flows belong in
+      that capability's own diagrams.md. If an existing cross-cutting diagram now
+      shows only that capability's behaviour, move it there.
+      - Action is one of: `update` (replace), `add` (new diagram), `move from
+      <old file>` (delete from the old file, add to this one), `remove` (delete).
+
+
+      Step 4 - Write the delta:
+      - `## Before State`: for every update, move and remove row, copy the
+      `## <Stable Name>` section VERBATIM from the file the row names (for a
+      move, from the old file) as `### <Stable Name>`. Nothing else.
+      - `## After State`: one `### <Stable Name>` per update, add and move row.
+      Keep existing stable names unchanged. Removed diagrams have no After
+      section.
+      - Run `python3 scripts/vsdd/validate_mermaid.py`: it checks the Placement
+      table against the Before/After sections and that Before copies are
+      verbatim.
 
 
       Rules:
