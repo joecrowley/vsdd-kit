@@ -111,6 +111,17 @@ command. It only asks you about decisions that are yours: which AI tools you use
 config changes, CI, and removing existing rules. At the end it reports what it
 installed.
 
+The mechanical Steps 0–5 are done by one script, `files/scripts/vsdd/vsdd_install.py`,
+in a few seconds, so the agent's time goes on the judgement steps: describing your
+project in `config.yaml`, and drawing the baseline diagrams from your code. This
+matters most with slower local models. The script stops and names a flag whenever a
+decision is yours, and changes nothing until you've answered. You can also run it
+yourself:
+
+```bash
+python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --tools claude --dry-run
+```
+
 | Step | What happens |
 |---|---|
 | 0 Preflight | Checks git, OpenSpec, Python and mmdc. Detects AI tools and any earlier or hand-edited install |
@@ -158,7 +169,7 @@ python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay wa
 | `.<tool>/skills/openspec-*` | Stock OpenSpec skills with the VSDD steps inserted, each marked `<!-- vsdd:… -->` |
 | `openspec/config.yaml` `operations` | The key VSDD steps, repeated as CLI guidance (newer OpenSpec) |
 | `.<tool>/command*/opsx-*` | Thin wrappers that load those skills |
-| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before), `merge_diagrams.py` (the archive merge, deterministic), `install_overlay.py`, `openspec_preflight.py` (what `openspec update` would delete, tools to add), `vsdd_snapshot.py` (saves and restores what git can't) |
+| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before), `merge_diagrams.py` (the archive merge, deterministic), `install_overlay.py`, `openspec_preflight.py` (what `openspec update` would delete, tools to add), `vsdd_snapshot.py` (saves and restores what git can't). The installer, `vsdd_install.py`, runs from the kit and isn't copied |
 | `.github/workflows/vsdd.yml` | CI: render every diagram and check the overlay (optional) |
 
 ## Design notes

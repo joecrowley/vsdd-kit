@@ -8,7 +8,8 @@ canonical diagram Source of Truth. Follow this runbook top to bottom.
 ## Rules for executing this runbook
 
 1. Run the steps **in order**. Each step ends with a **Verify** block. Do not start
-   the next step until Verify passes.
+   the next step until Verify passes. The **fast path** below runs Steps 0–5 for you;
+   use it unless it fails.
 2. If a Verify fails twice, **stop** and report to the user: the step, the command,
    its output, and what you tried.
 3. **Never overwrite** a file that already exists in the target unless the step
@@ -24,6 +25,52 @@ canonical diagram Source of Truth. Follow this runbook top to bottom.
 | `KIT` | The directory containing this `SETUP.md`. Its files are under `KIT/files/`. |
 | `ROOT` | The target project's root, where the setup is installed. Run commands from `ROOT`. |
 | `TOOLS` | The AI tools the team uses, as OpenSpec tool ids: `claude`, `opencode`, `qwen`, `cursor`, `codex`, `github-copilot`, `windsurf`, `gemini`, ... (full list: `openspec init --help`). |
+
+---
+
+## Fast path — the installer (recommended)
+
+`vsdd_install.py` does the mechanical work of Steps 0–5 in a few seconds: install
+branch and snapshot, `openspec init`/`update`, copying the files, the config keys,
+`AGENTS.md`/`CLAUDE.md`, and the overlay. It runs each step's Verify, and creates an
+empty decisions log. It never makes an **ASK** decision. When one is needed, it stops
+before changing anything and names the flag that records the user's answer.
+
+1. **ASK** the user to confirm `TOOLS` (see Step 0, "Choosing `TOOLS`").
+2. Dry run:
+
+   ```bash
+   python3 "$KIT"/files/scripts/vsdd/vsdd_install.py --root "$ROOT" --tools <TOOLS> --dry-run
+   ```
+
+   - **Exit 0:** it prints the plan. Go to 3.
+   - **Exit 3:** it lists the decisions needed. **ASK** the user each one, as the
+     matching step of this runbook describes, then re-run with the flags it names:
+
+     | Decision | Flag | Details |
+     |---|---|---|
+     | Uncommitted changes | `--allow-dirty` | Step 0 |
+     | `openspec update` would delete workflows | `--update safe` or `--update plain` (or the user fixes their profile and you re-run) | Step 1 |
+     | Custom schema | `--custom-schema switch` or `--custom-schema keep` | Step 3 |
+     | Home-folder tool (MiniMax) | `--extra-dir ~/.minimax` | Step 0 |
+     | Hand-edited skills | none: do Step 1b by hand, then re-run | Step 1b |
+
+   - **Exit 2:** a prerequisite is missing (OpenSpec CLI, version, tool ids). It says
+     which; **ASK** the user to fix it.
+3. Run it without `--dry-run`, with the same flags.
+   - **Exit 0:** Steps 0–5 are done. Read its **"Left for you"** list and do those
+     items in order. They are the judgement steps: writing `context:` (Step 3), the
+     `AGENTS.md` description (Step 4), anything it couldn't merge safely, then
+     Steps 6 to 9.
+   - **Exit 1:** a step failed. Everything before it is done (its "Done" list says
+     what). Continue by hand from the failed step of this runbook.
+
+Add `--json` for machine-readable output. Re-running the installer is safe: it
+upgrades an existing install, and on the install branch a re-run changes nothing.
+
+The numbered steps below are what the installer does, and the reference for the
+judgement steps. Follow them by hand only for a step the installer left to you or
+couldn't finish.
 
 ---
 
@@ -77,7 +124,9 @@ exact for the installed CLI version:
 ```bash
 ls "$ROOT"/openspec/schemas/visual-driven 2>/dev/null
 grep -rl "vsdd:" "$ROOT"/.*/skills/openspec-*/SKILL.md 2>/dev/null | head -3
-grep -rli "diagram" "$ROOT"/.*/skills/openspec-*/SKILL.md 2>/dev/null | head -3
+# only the skills VSDD patches: the stock explore skill mentions diagrams on its own
+ls "$ROOT"/.*/skills/openspec-{propose,continue-change,ff-change,update-change,apply-change,verify-change,archive-change,bulk-archive-change}/SKILL.md 2>/dev/null \
+  | xargs grep -Li "vsdd:" 2>/dev/null | xargs grep -li "diagram" 2>/dev/null | head -3
 ```
 
 | Finding | Meaning | Action |
@@ -188,7 +237,9 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 mkdir -p "$ROOT"/openspec/schemas "$ROOT"/docs "$ROOT"/scripts/vsdd
 cp -R "$KIT"/files/openspec/schemas/visual-driven "$ROOT"/openspec/schemas/
 cp "$KIT"/files/docs/VSDD.md "$ROOT"/docs/
-cp "$KIT"/files/scripts/vsdd/*.py "$ROOT"/scripts/vsdd/
+for f in validate_mermaid install_overlay merge_diagrams openspec_preflight vsdd_snapshot; do
+  cp "$KIT"/files/scripts/vsdd/$f.py "$ROOT"/scripts/vsdd/
+done   # vsdd_install.py stays in the kit
 [ -e "$ROOT"/docs/MERMAID_RULES.md ] || cp "$KIT"/files/docs/MERMAID_RULES.md "$ROOT"/docs/
 ```
 
@@ -395,7 +446,9 @@ if PyYAML is available). The first real run happens on the next push.
 
 ## Step 8 — End-to-end smoke test
 
-Use the `vsdd-smoke-test` change created in Step 3.
+Use the `vsdd-smoke-test` change created in Step 3. If it doesn't exist (the
+installer uses its own check change and removes it), create it:
+`openspec new change vsdd-smoke-test`.
 
 1. Write `openspec/changes/vsdd-smoke-test/diagrams.md` as a **YES** gate that
    modifies one Source of Truth diagram from Step 6:

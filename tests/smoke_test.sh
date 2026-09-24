@@ -299,6 +299,32 @@ else
 fi
 cd "$ROOT"
 
+step "One-shot installer (vsdd_install.py)"
+ROOT5="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-inst.XXXXXX")"
+IH="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-ihome.XXXXXX")"
+[ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT" "$XDG" "$ROOT2" "$XFULL" "$XLESS" "$ROOT3" "$XR" "$(dirname "$SNAP")" "$ROOT4" "$FH" "$ROOT5" "$IH"' EXIT
+INST="$KIT/files/scripts/vsdd/vsdd_install.py"
+cd "$ROOT5"; git init -q; echo "# demo" > README.md; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base
+echo "stray" > stray.txt
+rc=0; HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] && [ ! -d openspec ] && pass "stops on a dirty tree before changing anything (exit 3)" || fail "dirty tree: exit $rc"
+rm stray.txt
+HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" --dry-run >/dev/null 2>&1 && [ ! -d openspec ] \
+  && [ "$(git branch --show-current)" != vsdd-install ] && pass "dry run changes nothing" || fail "dry run changed something"
+OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && pass "fresh install (exit 0)" || { echo "$OUT"; fail "installer failed"; }
+[ "$(git branch --show-current)" = vsdd-install ] && pass "installed on the vsdd-install branch" || fail "no install branch"
+python3 scripts/vsdd/install_overlay.py --check >/dev/null && pass "installer: overlay OK" || fail "installer: overlay check"
+python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "installer: validator OK" || fail "installer: validator"
+CLAUDE_OK=1; [[ "$TOOLS" == *claude* ]] && ! grep -q "@AGENTS.md" CLAUDE.md 2>/dev/null && CLAUDE_OK=0
+[ -f openspec/specs/architecture/decisions.md ] && [ ! -d openspec/changes/vsdd-install-check ] && [ "$CLAUDE_OK" = 1 ] \
+  && pass "installer: decisions log, no leftover check change, CLAUDE.md" || fail "installer: files"
+grep -q "fill in \`context:\`" <<<"$OUT" && grep -q "Step 6: seed" <<<"$OUT" \
+  && pass "installer lists the judgement steps left (context, baseline diagrams)" || fail "installer to-do list"
+git add -A; git -c user.email=s@t -c user.name=smoke commit -qm install
+HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 && [ -z "$(git status --porcelain)" ] \
+  && pass "re-run (upgrade) is idempotent" || fail "re-run changed files: $(git status --porcelain | head -3)"
+cd "$ROOT"
+
 printf '\n\033[32mAll checks passed.\033[0m\n'
 [ -n "${KEEP:-}" ] && echo "Project kept at $ROOT"
 exit 0
