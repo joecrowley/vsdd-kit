@@ -7,8 +7,8 @@ files know nothing about diagrams, and `openspec update` overwrites any edits.
 This script re-applies the VSDD additions:
 
   skills   - inserts diagram steps into openspec-{propose,continue-change,
-             ff-change,apply-change,verify-change,archive-change,
-             bulk-archive-change} at anchor lines. Idempotent: each insertion
+             ff-change,update-change,apply-change,verify-change,
+             archive-change,bulk-archive-change} at anchor lines. Idempotent: each insertion
              carries a `<!-- vsdd:<id> -->` marker and is skipped if present.
   commands - rewrites the matching /opsx command files as thin wrappers that
              load the (patched) skill, so commands and skills cannot diverge.
@@ -48,7 +48,7 @@ GEN_DIAGRAMS = """\
 """
 
 PROPOSE_LIST = """\
-- diagrams.md (visual Before/After delta) <!-- vsdd:propose-list -->"""
+- diagrams.md (visual-driven schema: Before/After diagram delta, after the proposal) <!-- vsdd:propose-list -->"""
 
 APPLY_TRACE = """\
 <!-- vsdd:apply-trace -->
@@ -90,11 +90,13 @@ ARCHIVE_SYNC = """\
 <!-- vsdd:archive-sync -->
 4a. **Sync diagrams into the Source of Truth (VSDD)**
 
-   Read `openspec/changes/<name>/diagrams.md`.
+   Read `diagrams.md` in the change directory (`<changeRoot>` when the CLI reports
+   one, otherwise `openspec/changes/<name>/`).
    - Missing, or gate is NO: no-op. Record "Diagrams: no-op".
    - Gate is YES: for each `### <Stable Name>` section under `## After State`:
-     - Target file: the owning capability's `openspec/specs/<capability>/diagrams.md`
-       (cross-cutting: `openspec/specs/architecture/diagrams.md`).
+     - Target file: the owning capability's `specs/<capability>/diagrams.md` under the
+       planning root (default `openspec/specs/`); cross-cutting diagrams go in
+       `specs/architecture/diagrams.md`.
      - Stable name exists as `## <Stable Name>` in the target: REPLACE that section
        (description + mermaid block) with the After version.
      - Stable name is new: APPEND it as a `## <Stable Name>` section.
@@ -109,6 +111,9 @@ ARCHIVE_SYNC = """\
 
 ARCHIVE_GUARDRAIL = """\
 - VSDD: diagram merges are section-targeted by stable name, a NO gate is always a no-op, and the summary must include a Diagrams line <!-- vsdd:archive-guardrail -->"""
+
+UPDATE_GUARDRAIL = """\
+- VSDD: when revising `diagrams.md`, never edit `## Before State` (it is a verbatim Source of Truth snapshot), keep `### <Stable Name>` headings unchanged, re-check the `## Diagram needed?` gate if the scope changed, and keep the After State consistent with the revised proposal, specs and design. Read `docs/VSDD.md` first <!-- vsdd:update-guardrail -->"""
 
 BULK_GUARDRAIL = """\
 - VSDD: before moving EACH change to the archive, perform the diagram sync described in the `openspec-archive-change` skill (step 4a) for that change, in archive order <!-- vsdd:bulk-guardrail -->"""
@@ -134,6 +139,9 @@ PATCHES: dict[str, list[Patch]] = {
     "openspec-ff-change": [
         Patch("gen-diagrams", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DIAGRAMS),
     ],
+    "openspec-update-change": [
+        Patch("update-guardrail", (r"^\*\*Guardrails\*\*\s*$",), "after", UPDATE_GUARDRAIL),
+    ],
     "openspec-apply-change": [
         Patch("apply-trace", (r"^\d+\.\s+\*\*On completion or pause", r"^\*\*Guardrails\*\*"), "before", APPLY_TRACE),
     ],
@@ -155,6 +163,7 @@ COMMANDS = {
     "propose": "openspec-propose",
     "continue": "openspec-continue-change",
     "ff": "openspec-ff-change",
+    "update": "openspec-update-change",
     "apply": "openspec-apply-change",
     "verify": "openspec-verify-change",
     "archive": "openspec-archive-change",

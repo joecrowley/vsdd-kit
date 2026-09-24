@@ -139,12 +139,16 @@ openspec schemas | grep visual-driven
 
 ## Step 3 — Configure `openspec/config.yaml`
 
-OpenSpec 1.2.x reads only two project keys: **`context`** (injected into every
-artifact) and **`rules`** (per-artifact constraints). **Any other key, such as
-`prompts:`, is silently ignored.**
+The OpenSpec CLI reads **`context`** (injected into every artifact) and **`rules`**
+(per-artifact constraints). Newer versions (e.g. 1.13) also read **`operations`**
+(advisory guidance for the apply and archive workflows). The kit uses `operations`
+as a backstop that re-states the diagram steps if the skill overlay is ever wiped.
+**Any other key, such as `prompts:`, is silently ignored.**
 
-- **No `config.yaml` yet:** copy `KIT/files/openspec/config.yaml.example` to
-  `ROOT/openspec/config.yaml`. Then fill in `context:` from the project itself:
+- **No `config.yaml`, or only the stock template:** newer `openspec init` creates
+  a template that is just `schema: spec-driven` plus commented-out examples. Treat
+  that as "no config". Replace it with `KIT/files/openspec/config.yaml.example`, then
+  fill in `context:` from the project itself:
   read the README, the package manifests (`package.json`, `pubspec.yaml`,
   `pyproject.toml`, `go.mod`, ...) and the top-level directory layout. Keep it to
   4–8 lines of facts agents need. Don't invent conventions you can't see in the
@@ -156,7 +160,9 @@ artifact) and **`rules`** (per-artifact constraints). **Any other key, such as
      harm than having none.
   3. Add the `rules.diagrams` list from the example, if it isn't already there.
   4. Add the `rules.tasks` VSDD line.
-  5. Add `context:` if it's missing, filled in as above.
+  5. Add the `operations.apply` and `operations.archive` VSDD guidance entries from the
+     example. Keep any guidance entries already there.
+  6. Add `context:` if it's missing, filled in as above.
 
 **Verify** with a throwaway change (it is removed in Step 8):
 
@@ -167,6 +173,13 @@ openspec instructions diagrams --change vsdd-smoke-test | grep -E "<project_cont
 
 All three patterns must appear. If `<rules>` is missing, the YAML key is wrong or
 the indentation is broken.
+
+On newer OpenSpec (if `openspec instructions --help` mentions `archive`), also check
+the backstop:
+
+```bash
+openspec instructions archive --change vsdd-smoke-test --json | grep -c "VSDD"    # >= 1
+```
 
 ---
 
@@ -204,10 +217,12 @@ python3 scripts/vsdd/install_overlay.py
 
 What it does, for every tool folder (`.claude`, `.opencode`, `.qwen`, ...):
 
-- Inserts marked VSDD blocks into these skills: `openspec-propose`, `-continue-change`,
-  `-ff-change` (diagram generation), `-apply-change` (trace the After state against
-  the code), `-verify-change` (Diagram Fidelity), `-archive-change` (merge into the
-  Source of Truth), and `-bulk-archive-change`.
+- Inserts marked VSDD blocks into whichever of these skills exist: `openspec-propose`,
+  `-continue-change`, `-ff-change` (diagram generation), `-update-change` (rules for
+  revising `diagrams.md`), `-apply-change` (trace the After state against the code),
+  `-verify-change` (Diagram Fidelity), `-archive-change` (merge into the Source of
+  Truth), and `-bulk-archive-change`. Which skills exist depends on the OpenSpec
+  workflow profile (`openspec config list`).
 - Rewrites the matching `/opsx` command files as thin wrappers that load the skill.
   Stock commands contain their **own copy** of the skill text, so without this step
   the commands would bypass the VSDD steps.
@@ -333,7 +348,7 @@ Then suggest the user commit everything as a single commit, for example
 | `openspec update` or `openspec init` was run | `python3 scripts/vsdd/install_overlay.py`. CI's `--check` catches a forgotten run |
 | OpenSpec upgraded to a new minor or major version | Run the overlay with `--dry-run` first. On `anchor not found`, see Step 5 |
 | A new AI tool is added | `openspec update` (after adding the tool via `openspec init --tools`), then the overlay |
-| Kit upgraded | Re-run Steps 2, 4 and 5. They are idempotent |
+| Kit upgraded | Re-run Steps 2, 3 (new `rules`/`operations` entries) and 4. For Step 5, first restore stock skills with `openspec update`, then run the overlay. Blocks already marked `vsdd:` are skipped, so their text only refreshes from stock |
 
 ## Troubleshooting
 

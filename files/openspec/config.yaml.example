@@ -1,9 +1,13 @@
 schema: visual-driven
 
-# OpenSpec 1.2.x reads exactly two project-level keys: `context` and `rules`.
-# Any other key (e.g. `prompts:`) is silently ignored.
-# Verify with: openspec instructions diagrams --change <name>
-#   -> look for <project_context> and <rules> blocks in the output.
+# Project keys the OpenSpec CLI reads (any other key, e.g. `prompts:`, is silently ignored):
+#   context     - injected into every artifact                          (OpenSpec >= 1.2)
+#   rules       - per-artifact constraints                              (OpenSpec >= 1.2)
+#   operations  - advisory guidance for the apply / archive workflows   (newer OpenSpec, e.g. 1.13;
+#                 older versions ignore it, which is harmless)
+# Verify:
+#   openspec instructions diagrams --change <name>          -> <project_context> and <rules> blocks
+#   openspec instructions archive  --change <name> --json   -> "operationGuidance" (newer OpenSpec)
 
 # Injected into every artifact. Keep it short: stack, layout, key conventions.
 context: |
@@ -22,7 +26,15 @@ rules:
     - "Snapshot the Before State verbatim from openspec/specs/<capability>/diagrams.md (cross-cutting: openspec/specs/architecture/diagrams.md); copy only the affected stable-named sections."
     - "Keep stable section names unchanged when modifying an existing diagram - the archive merge targets sections by name."
     - "If no visual concern is affected, record NO with a one-line reason and omit Before/After sections."
-  specs: []
-  design: []
   tasks:
     - "If diagrams.md has a YES gate, the final task group MUST include: trace the After State against the code and record any Deviations, then run python3 scripts/vsdd/validate_mermaid.py."
+
+# VSDD backstop: delivered by the CLI to the stock apply/archive skills, so the key
+# diagram steps still happen if `openspec update` has wiped the skill overlay.
+operations:
+  apply:
+    guidance:
+      - "VSDD: if the change's diagrams.md has a YES gate, before finishing trace every participant, node and edge in its After State against the code. Where the code differs, update the After State to match and add a top-level `## Deviations` section (Proposed / Built / Why)."
+  archive:
+    guidance:
+      - "VSDD: before moving the change to the archive, merge its diagrams.md into the Source of Truth as described in docs/VSDD.md section 4: for each `### <Stable Name>` under `## After State`, replace the matching `## <Stable Name>` section in specs/<capability>/diagrams.md (cross-cutting: specs/architecture/diagrams.md), or append it if new. Skip if the gate is NO. Never merge Before State or Deviations. Include a Diagrams line in the archive summary."

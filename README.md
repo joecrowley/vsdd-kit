@@ -140,6 +140,7 @@ python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay wa
 | `docs/MERMAID_RULES.md` | Syntax guardrails that keep LLM-written diagrams parseable |
 | `AGENTS.md` section / `CLAUDE.md` | A short section that sends agents to the detailed docs only when they need them |
 | `.<tool>/skills/openspec-*` | Stock OpenSpec skills with the VSDD steps inserted, each marked `<!-- vsdd:… -->` |
+| `openspec/config.yaml` `operations` | The key VSDD steps, repeated as CLI guidance (newer OpenSpec) |
 | `.<tool>/command*/opsx-*` | Thin wrappers that load those skills |
 | `scripts/vsdd/` | `validate_mermaid.py`, `install_overlay.py` |
 | `.github/workflows/vsdd.yml` | CI: render every diagram and check the overlay (optional) |
@@ -156,9 +157,15 @@ in place, and `--check` reports whether it is applied.
 skill instructions. Without wrapping, typing `/opsx:archive` would skip the diagram
 merge.
 
-**Only `context:` and `rules:` are read.** OpenSpec 1.2.x reads only those two keys
-from `config.yaml`, and ignores any other key (such as `prompts:`) without warning.
-The example config and Step 3 of the runbook take care of this.
+**Only known config keys are read.** OpenSpec reads `context:` and `rules:` from
+`config.yaml` (newer versions also read `operations:`), and ignores any other key
+(such as `prompts:`) without warning. The example config and Step 3 of the runbook
+take care of this.
+
+**A second channel for the key steps.** On newer OpenSpec, the example config also
+states the check against the code and the archive merge as `operations.apply` and
+`operations.archive` guidance. The CLI hands that guidance to the *stock* skills, so
+those steps still happen even if an `openspec update` has wiped the overlay.
 
 **The rule that matters most is also in the schema.** The rule that the diagram must
 be checked against the code is in `schema.yaml` (`apply.instruction`), so the CLI
@@ -185,18 +192,26 @@ the quotes show up in the rendered output. The validator enforces all of these, 
 ## Testing the kit
 
 ```bash
-tests/smoke_test.sh                 # tools: claude,opencode,qwen
-TOOLS=claude tests/smoke_test.sh    # a single tool
-KEEP=1 tests/smoke_test.sh          # keep the temp project for inspection
+tests/smoke_test.sh                     # tools: claude,opencode,qwen
+TOOLS=claude tests/smoke_test.sh        # a single tool
+KEEP=1 tests/smoke_test.sh              # keep the temp project for inspection
+GLOBAL_PROFILE=1 tests/smoke_test.sh    # use your own OpenSpec workflow profile
 ```
 
 The test builds a throwaway project, runs the `SETUP.md` steps against your installed
-OpenSpec, and checks 23 conditions:
+OpenSpec, and checks every Verify condition:
 
-- schema validity and `context`/`rules` injection
-- overlay apply, idempotency and command wrapping
+- schema validity, and `context`/`rules` injection
+- the `operations` backstop, when the CLI supports `instructions archive`
+- overlay apply, idempotency, command wrapping, and every patched skill for each tool
 - diagram validation, including deliberately broken cases
 - recovery after `openspec update`
+
+By default it uses an isolated OpenSpec config with **every workflow enabled**, so the
+result doesn't depend on your machine's profile, and all overlay patches are exercised.
+Run it after changing the kit and after every OpenSpec upgrade. An `anchor not found`
+from the overlay means the stock skill text changed, so update the `PATCHES` anchors
+in `install_overlay.py`.
 
 ## Repository layout
 
@@ -217,8 +232,11 @@ vsdd-kit/
 
 ## Compatibility
 
-Tested with OpenSpec **1.2.0**: stock skills for Claude Code, OpenCode and Qwen Code,
-plus the custom-profile workflows continue, ff, new, bulk-archive and onboard.
+Tested with OpenSpec **1.2.0** and **1.13.2**: stock skills for Claude Code, OpenCode
+and Qwen Code, and every optional workflow (continue, ff, new, update, bulk-archive,
+onboard). With 1.13.2, `openspec init` writes a template `config.yaml`, the skills
+resolve paths through `<changeRoot>`, and the new `update` workflow gets VSDD rules
+for revising `diagrams.md`.
 Also tested with mermaid-cli 11.16.0 and Python 3. Other OpenSpec tools use the same
 skill format and should work. If a stock skill's text differs, the overlay reports
 `anchor not found` and does not insert anything at the wrong place.

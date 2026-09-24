@@ -7,12 +7,27 @@
 #   tests/smoke_test.sh            # tools: claude,opencode,qwen
 #   TOOLS=claude tests/smoke_test.sh
 #   KEEP=1 tests/smoke_test.sh     # keep the temp project for inspection
+#   GLOBAL_PROFILE=1 tests/smoke_test.sh   # use your global OpenSpec profile instead of
+#                                          # an isolated one with every workflow enabled
 set -euo pipefail
 
 KIT="$(cd "$(dirname "$0")/.." && pwd)"
 TOOLS="${TOOLS:-claude,opencode,qwen}"
 ROOT="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke.XXXXXX")"
-[ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT"' EXIT
+XDG="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-cfg.XXXXXX")"
+[ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT" "$XDG"' EXIT
+
+# Isolated OpenSpec global config with every workflow, so the result doesn't depend
+# on the machine's profile and every overlay patch is exercised. Unknown workflow ids
+# are ignored by older CLIs.
+if [ -z "${GLOBAL_PROFILE:-}" ]; then
+  mkdir -p "$XDG/openspec"
+  cat > "$XDG/openspec/config.json" <<'JSON'
+{"featureFlags":{},"profile":"custom","delivery":"both","telemetry":{"noticeSeen":true},
+ "workflows":["propose","explore","new","continue","update","ff","apply","sync","archive","bulk-archive","verify","onboard"]}
+JSON
+  export XDG_CONFIG_HOME="$XDG"
+fi
 
 pass() { printf '  \033[32mok\033[0m  %s\n' "$1"; }
 fail() { printf '  \033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
@@ -29,6 +44,7 @@ cd "$ROOT"; git init -q
 step "1. openspec init"
 openspec init --tools "$TOOLS" . </dev/null >/dev/null 2>&1 || fail "openspec init"
 ls -d .*/skills/openspec-propose >/dev/null 2>&1 && pass "stock skills generated" || fail "no stock skills"
+echo "  info  skills per tool: $(ls -d .claude/skills/openspec-* .opencode/skills/openspec-* .qwen/skills/openspec-* 2>/dev/null | wc -l | tr -d ' ') total"
 
 step "2. copy kit files"
 mkdir -p openspec/schemas docs scripts/vsdd
@@ -46,6 +62,14 @@ OUT="$(openspec instructions diagrams --change vsdd-smoke-test 2>/dev/null)"
 for pat in "<project_context>" "<rules>" "MERMAID_RULES"; do
   grep -q "$pat" <<<"$OUT" && pass "diagrams instructions contain $pat" || fail "missing $pat in instructions"
 done
+if openspec instructions --help 2>&1 | grep -q archive; then
+  openspec instructions archive --change vsdd-smoke-test --json 2>/dev/null | grep -q "VSDD" \
+    && pass "operations.archive guidance delivered by CLI" || fail "operations.archive guidance missing"
+  openspec instructions apply --change vsdd-smoke-test --json 2>/dev/null | grep -q "VSDD" \
+    && pass "operations.apply guidance delivered by CLI" || fail "operations.apply guidance missing"
+else
+  echo "  skip  operations guidance (this OpenSpec has no 'instructions archive')"
+fi
 
 step "4. agent files"
 cp "$KIT"/files/agents/AGENTS.vsdd.md AGENTS.md
@@ -59,6 +83,12 @@ before="$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)"
 python3 scripts/vsdd/install_overlay.py >/dev/null
 [ "$before" = "$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)" ] && pass "overlay idempotent" || fail "overlay not idempotent"
 grep -q "vsdd:wrapper" .*/command*/opsx*archive* .*/commands/opsx/archive.md 2>/dev/null && pass "commands wrapped" || fail "commands not wrapped"
+for s in propose apply-change verify-change archive-change continue-change ff-change update-change bulk-archive-change; do
+  for f in .*/skills/openspec-$s/SKILL.md; do
+    [ -e "$f" ] || continue
+    grep -q "vsdd:" "$f" && pass "patched $f" || fail "not patched: $f"
+  done
+done
 
 step "6. seed Source of Truth"
 mkdir -p openspec/specs/architecture

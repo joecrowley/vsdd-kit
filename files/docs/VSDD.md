@@ -60,7 +60,11 @@ in the proposal.
 
 The merge is done by the `openspec-archive-change` skill, not by the
 `openspec archive` CLI. Always archive through the skill or the `/opsx` archive
-command.
+command. On newer OpenSpec, the same instruction also reaches the stock archive skill
+as `operations.archive.guidance` from `openspec/config.yaml`, as a backstop.
+
+Paths here assume the default planning root `openspec/`. If your OpenSpec setup
+uses another root or a registered store, the same layout applies under that root.
 
 ## 5. Validation
 
