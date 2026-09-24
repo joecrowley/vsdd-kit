@@ -38,12 +38,25 @@ from pathlib import Path
 
 SKIP_DIRS = {".git", "node_modules", ".dart_tool", "build", ".venv", "venv"}
 STOCK_SCHEMAS = {"spec-driven", "visual-driven"}
-# OpenSpec tool id -> folder it writes. Tools not listed are reported as unknown.
-TOOL_DIRS = {
-    "claude": ".claude", "opencode": ".opencode", "qwen": ".qwen", "cursor": ".cursor",
-    "codex": ".codex", "gemini": ".gemini", "windsurf": ".windsurf", "kiro": ".kiro",
-    "github-copilot": ".github", "cline": ".cline", "roocode": ".roo", "kilocode": ".kilocode",
+# OpenSpec tool id -> project folders it writes (measured with OpenSpec 1.13.2 by running
+# `openspec init --tools <id>` for every tool). Several tools share `.agents`.
+# HOME_TOOLS write outside the project instead.
+TOOL_DIRS: dict[str, tuple[str, ...]] = {
+    "amazon-q": (".amazonq",), "antigravity": (".agents",), "auggie": (".augment",),
+    "bob": (".bob",), "claude": (".claude",), "cline": (".cline", ".clinerules"),
+    "command-code": (".commandcode",), "codeartsagent": (".codeartsdoer",), "codex": (".agents",),
+    "devin": (".devin",), "windsurf": (".devin",), "forgecode": (".forge",),
+    "codebuddy": (".codebuddy",), "continue": (".continue",), "costrict": (".cospec",),
+    "crush": (".crush",), "cursor": (".cursor",), "factory": (".factory",),
+    "gemini": (".gemini",), "github-copilot": (".github",), "hermes": (".hermes",),
+    "iflow": (".iflow",), "junie": (".junie",), "kilocode": (".kilo", ".kilocode"),
+    "kimi": (".kimi-code",), "kiro": (".kiro",), "lingma": (".lingma",), "vibe": (".vibe",),
+    "oh-my-pi": (".omp",), "opencode": (".opencode",), "pi": (".pi",),
+    "codeassistant": (".codeassistant",), "qoder": (".qoder",), "qwen": (".qwen",),
+    "rovodev": (".rovodev",), "roocode": (".roo",), "trae": (".trae",), "zed": (".agents",),
+    "zcode": (".zcode",), "agents": (".agents",),
 }
+HOME_TOOLS: dict[str, str] = {"minimax-code": "~/.minimax"}
 
 
 def workflow_id(skill_dir: str) -> str:
@@ -109,8 +122,11 @@ def in_flight_changes(root: Path) -> list[tuple[str, str]]:
     return out
 
 
+MANAGED_DIRS = {d for dirs in TOOL_DIRS.values() for d in dirs}
+
+
 def tool_for_dir(folder: str) -> str | None:
-    return next((t for t, d in TOOL_DIRS.items() if d == folder), None)
+    return next((t for t, dirs in TOOL_DIRS.items() if folder in dirs), None)
 
 
 def safe_update(root: Path, keep: set[str]) -> int:
@@ -153,18 +169,22 @@ def main() -> int:
     version = run(["openspec", "--version"], root).stdout.strip()
     initialised = (root / "openspec").is_dir()
     installed = installed_skills(root) if root.is_dir() else {}
-    managed = {d: ws for d, ws in installed.items() if tool_for_dir(d)}
+    managed = {d: ws for d, ws in installed.items() if d in MANAGED_DIRS}
     installed_all = {w for ws in managed.values() for w in ws}
-    probe_tool = next((tool_for_dir(d) for d in installed if tool_for_dir(d)), "claude")
-    profile = profile_workflows(probe_tool)
+    # Always probe with claude: it writes only inside the throwaway folder.
+    profile = profile_workflows("claude")
     would_remove = sorted(installed_all - profile) if profile is not None else []
     requested = [t.strip() for t in args.tools.split(",") if t.strip()]
     missing_tools, unknown_tools = [], []
+    home_tools = []
     for tool in requested:
-        folder = TOOL_DIRS.get(tool)
-        if folder is None:
+        if tool in HOME_TOOLS:
+            home_tools.append(tool)
+            continue
+        folders = TOOL_DIRS.get(tool)
+        if folders is None:
             unknown_tools.append(tool)
-        elif folder not in installed:
+        elif not any(f in installed for f in folders):
             missing_tools.append(tool)
     schema = configured_schema(root)
     custom_schema = schema is not None and schema not in STOCK_SCHEMAS
@@ -187,6 +207,7 @@ def main() -> int:
         "update_would_remove": would_remove,
         "tools_to_add": missing_tools,
         "unknown_tools": unknown_tools,
+        "home_folder_tools": {t: HOME_TOOLS[t] for t in home_tools},
         "in_flight_changes": [{"name": n, "schema": s} for n, s in changes],
     }
     if args.json:
@@ -206,6 +227,9 @@ def main() -> int:
             print("   run this script with --safe-update instead of a plain `openspec update`.")
         if missing_tools:
             print(f"Tools to add:        {', '.join(missing_tools)}  ->  openspec init --tools {','.join(missing_tools)} .")
+        for t in home_tools:
+            print(f"Home-folder tool:    {t} installs skills in {HOME_TOOLS[t]} (machine-wide) -> ASK; then pass")
+            print(f"                     --extra-dir {HOME_TOOLS[t]} to install_overlay.py and vsdd_snapshot.py")
         if unknown_tools:
             print(f"Unknown tool ids:    {', '.join(unknown_tools)} (check their folder by hand)")
         for name, s in changes:

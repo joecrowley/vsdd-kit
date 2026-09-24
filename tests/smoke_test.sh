@@ -247,6 +247,35 @@ XDG_CONFIG_HOME="$XR" python3 "$SNAPPY" restore "$SNAP" --dry-run | grep -q "not
   && pass "second restore: nothing to restore" || fail "restore not idempotent"
 cd "$ROOT"
 
+step "All OpenSpec tools: overlay + preflight (sandboxed HOME)"
+ROOT4="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-alltools.XXXXXX")"
+FH="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-home.XXXXXX")"
+[ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT" "$XDG" "$ROOT2" "$XFULL" "$XLESS" "$ROOT3" "$XR" "$(dirname "$SNAP")" "$ROOT4" "$FH"' EXIT
+mkdir -p "$FH/.config/openspec"
+cp "$XFULL/openspec/config.json" "$FH/.config/openspec/config.json"
+cd "$ROOT4"; git init -q
+if HOME="$FH" XDG_CONFIG_HOME="$FH/.config" CODEX_HOME="$FH/.codex" openspec init --tools all . </dev/null >/dev/null 2>&1; then
+  NTOOLS=$(find . -path ./.git -prune -o -type d -name openspec-propose -print | wc -l | tr -d ' ')
+  pass "openspec init --tools all: $NTOOLS project tool folders"
+  HOME="$FH" python3 "$KIT/files/scripts/vsdd/install_overlay.py" --extra-dir "$FH/.minimax" >/dev/null || fail "overlay (all tools)"
+  HOME="$FH" python3 "$KIT/files/scripts/vsdd/install_overlay.py" --check --extra-dir "$FH/.minimax" >/dev/null \
+    && pass "overlay --check passes for every tool (incl. home-folder MiniMax)" || fail "overlay --check (all tools)"
+  # The 8 commands whose skills VSDD patches (explore/sync/new/onboard stay stock).
+  WRAPPED_RE='(opsx-|/opsx/)(propose|continue|ff|update|apply|verify|archive|bulk-archive)\.(md|prompt\.md|prompt|toml)$'
+  CMDS=$(find . -path ./.git -prune -o -type f -print | grep -E "$WRAPPED_RE")
+  NCMD=$(printf '%s\n' "$CMDS" | grep -c . || true)
+  UNWRAPPED=0
+  while read -r f; do
+    if [ -n "$f" ] && ! grep -q "vsdd:wrapper" "$f"; then UNWRAPPED=$((UNWRAPPED + 1)); fi
+  done <<<"$CMDS"
+  [ "$UNWRAPPED" = 0 ] && [ "$NCMD" -gt 0 ] && pass "all $NCMD VSDD command files are wrappers" || fail "$UNWRAPPED of $NCMD command files not wrapped"
+  HOME="$FH" XDG_CONFIG_HOME="$FH/.config" python3 "$KIT/files/scripts/vsdd/openspec_preflight.py" | grep -q "not an OpenSpec tool folder" \
+    && fail "preflight mislabels an OpenSpec tool folder" || pass "preflight recognises every tool folder"
+else
+  echo "  skip  this OpenSpec has no '--tools all'"
+fi
+cd "$ROOT"
+
 printf '\n\033[32mAll checks passed.\033[0m\n'
 [ -n "${KEEP:-}" ] && echo "Project kept at $ROOT"
 exit 0

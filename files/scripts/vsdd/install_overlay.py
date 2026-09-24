@@ -252,12 +252,15 @@ def rewrite_command(path: Path, body: str) -> str:
         head = desc.group(0) + "\n\n" if desc else ""
         return f'{head}prompt = """\n{body}"""\n'
     fm = re.match(r"^---\n.*?\n---\n", text, re.S)
-    return (fm.group(0) + "\n" if fm else "") + body
+    if fm:
+        return fm.group(0) + "\n" + body
+    heading = re.match(r"^# .*\n", text)  # e.g. Cline workflows: "# OPSX: Propose"
+    return (heading.group(0) + "\n" if heading else "") + body
 
 
 def command_name(path: Path) -> str | None:
     stem = path.name
-    for suffix in (".prompt.md", ".md", ".toml"):
+    for suffix in (".prompt.md", ".md", ".toml", ".prompt"):
         if stem.endswith(suffix):
             stem = stem[: -len(suffix)]
             break
@@ -270,6 +273,13 @@ def command_name(path: Path) -> str | None:
     return None
 
 
+def display(path: Path, root: Path) -> str:
+    try:
+        return str(path.relative_to(root))
+    except ValueError:
+        return str(path)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", type=Path, default=Path.cwd())
@@ -277,20 +287,27 @@ def main() -> int:
     mode.add_argument("--dry-run", action="store_true")
     mode.add_argument("--check", action="store_true")
     ap.add_argument("--no-commands", action="store_true", help="patch skills only")
+    ap.add_argument("--extra-dir", type=Path, action="append", default=[],
+                    help="also treat this folder as a tool folder (e.g. ~/.minimax for tools that "
+                         "install skills in your home folder). Repeatable. Machine-wide: ask first")
     args = ap.parse_args()
     root = args.root.resolve()
+    dirs = tool_dirs(root) + [d.expanduser().resolve() for d in args.extra_dir if d.expanduser().is_dir()]
 
+    # Pass 1: patch skills in every tool folder, remembering where each skill lives.
     skills_found = 0
     problems = 0
-    for tdir in tool_dirs(root):
+    files_by_dir: dict[Path, list[Path]] = {}
+    skills_by_dir: dict[Path, dict[str, Path]] = {}
+    for tdir in dirs:
         files = list(walk(tdir))
-        skill_paths: dict[str, Path] = {}
-        for f in files:
-            if f.name == "SKILL.md" and f.parent.name.startswith("openspec-"):
-                skill_paths[f.parent.name] = f
+        files_by_dir[tdir] = files
+        skill_paths = {f.parent.name: f for f in files
+                       if f.name == "SKILL.md" and f.parent.name.startswith("openspec-")}
+        skills_by_dir[tdir] = skill_paths
         if not skill_paths:
             continue
-        print(f"[{tdir.name}]")
+        print(f"[{display(tdir, root)}]")
         for skill, path in sorted(skill_paths.items()):
             skills_found += 1
             patches = PATCHES.get(skill)
@@ -298,7 +315,7 @@ def main() -> int:
                 continue
             original = path.read_text(encoding="utf-8")
             new, applied, missing = apply_patches(original, patches)
-            rel = path.relative_to(root)
+            rel = display(path, root)
             if missing:
                 problems += 1
                 print(f"  ! {rel}: anchor not found for {', '.join(missing)} - apply by hand (see SETUP.md)")
@@ -314,26 +331,44 @@ def main() -> int:
             elif not missing:
                 print(f"  = {rel}: up to date")
 
-        if args.no_commands:
-            continue
-        for f in sorted(files):
-            cmd = command_name(f)
-            skill = COMMANDS.get(cmd or "")
-            if not skill or skill not in skill_paths:
-                continue
-            rel = f.relative_to(root)
-            if WRAPPER_MARK in f.read_text(encoding="utf-8"):
-                print(f"  = {rel}: wrapper up to date")
-                continue
-            if args.check:
-                problems += 1
-                print(f"  x {rel}: stock command (bypasses VSDD skill)")
-            elif args.dry_run:
-                print(f"  ~ {rel}: would become wrapper -> {skill}")
-            else:
-                body = wrapper_body(str(skill_paths[skill].relative_to(root)), skill)
-                f.write_text(rewrite_command(f, body), encoding="utf-8")
-                print(f"  + {rel}: now wraps {skill}")
+    # Pass 2: wrap /opsx commands. Some tools keep commands in a folder without skills
+    # (Kilo: .kilo/command, Cline: .clinerules/workflows) - point those at a patched copy
+    # elsewhere in the project, preferring the shared .agents/skills.
+    def skill_for(tdir: Path, skill: str) -> Path | None:
+        if skill in skills_by_dir.get(tdir, {}):
+            return skills_by_dir[tdir][skill]
+        candidates = sorted((d for d in dirs if skill in skills_by_dir.get(d, {}) and d.is_relative_to(root)),
+                            key=lambda d: (not (d.name.startswith(tdir.name) or tdir.name.startswith(d.name)),
+                                           d.name != ".agents", d.name))
+        return skills_by_dir[candidates[0]][skill] if candidates else None
+
+    if not args.no_commands:
+        for tdir in dirs:
+            header_printed = False
+            for f in sorted(files_by_dir[tdir]):
+                cmd = command_name(f)
+                skill = COMMANDS.get(cmd or "")
+                if not skill:
+                    continue
+                target = skill_for(tdir, skill)
+                if target is None:
+                    continue
+                if not header_printed:
+                    print(f"[{display(tdir, root)}] commands")
+                    header_printed = True
+                rel = display(f, root)
+                if WRAPPER_MARK in f.read_text(encoding="utf-8"):
+                    print(f"  = {rel}: wrapper up to date")
+                    continue
+                if args.check:
+                    problems += 1
+                    print(f"  x {rel}: stock command (bypasses VSDD skill)")
+                elif args.dry_run:
+                    print(f"  ~ {rel}: would become wrapper -> {skill}")
+                else:
+                    body = wrapper_body(display(target, root), skill)
+                    f.write_text(rewrite_command(f, body), encoding="utf-8")
+                    print(f"  + {rel}: now wraps {skill}")
 
     if skills_found == 0:
         print("No OpenSpec skills found. Run `openspec init --tools <tool>` first.", file=sys.stderr)

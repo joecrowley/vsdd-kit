@@ -19,6 +19,7 @@ so `git clean` or a reset can't delete them.
 
 Usage (from the project root):
   python3 scripts/vsdd/vsdd_snapshot.py save
+  python3 scripts/vsdd/vsdd_snapshot.py save --extra-dir ~/.minimax   # home-folder tools
   python3 scripts/vsdd/vsdd_snapshot.py latest                    # print newest snapshot dir
   python3 scripts/vsdd/vsdd_snapshot.py restore <dir> --dry-run   # show what would change
   python3 scripts/vsdd/vsdd_snapshot.py restore <dir> --yes       # restore untracked files
@@ -79,6 +80,15 @@ def footprint_files(root: Path) -> set[str]:
     return out
 
 
+def extra_files(folder: Path) -> set[str]:
+    """OpenSpec skill/command files in an extra (e.g. home-folder) tool folder."""
+    if not folder.is_dir():
+        return set()
+    return {p.relative_to(folder).as_posix() for p in folder.rglob("*")
+            if p.is_file() and not p.is_symlink()
+            and any("openspec-" in part or "opsx" in part for part in p.relative_to(folder).parts)}
+
+
 def tracked_files(root: Path) -> set[str] | None:
     """Files git tracks, or None if root is not a git work tree."""
     proc = run(["git", "ls-files", "-z"], root)
@@ -103,7 +113,7 @@ def cli_version() -> str | None:
     return run(["openspec", "--version"], Path.cwd()).stdout.strip() or None
 
 
-def cmd_save(root: Path, out: Path | None) -> int:
+def cmd_save(root: Path, out: Path | None, extra_dirs: list[Path]) -> int:
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     snap = out or DEFAULT_HOME / f"{root.name}-{stamp}"
     if snap.exists():
@@ -117,6 +127,14 @@ def cmd_save(root: Path, out: Path | None) -> int:
         dest = files_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(root / rel, dest)
+    extras = []
+    for i, folder in enumerate(extra_dirs):
+        rels = sorted(extra_files(folder))
+        for rel in rels:
+            dest = snap / "extra" / str(i) / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(folder / rel, dest)
+        extras.append({"dir": str(folder), "files": {rel: sha256(folder / rel) for rel in rels}})
     gpath = global_config_path()
     global_info = {"path": str(gpath) if gpath else None, "existed": bool(gpath and gpath.is_file())}
     if global_info["existed"]:
@@ -127,11 +145,13 @@ def cmd_save(root: Path, out: Path | None) -> int:
     manifest = {
         "created": stamp, "root": str(root), "git": {"repo": in_git, "head": head, "branch": branch},
         "files": {rel: sha256(root / rel) for rel in saved},
-        "global_config": global_info, "openspec_version": cli_version(),
+        "global_config": global_info, "openspec_version": cli_version(), "extra_dirs": extras,
     }
     (snap / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"Snapshot saved: {snap}")
     print(f"  untracked footprint files: {len(saved)}" + ("" if in_git else " (not a git repo: all footprint files)"))
+    for e in extras:
+        print(f"  extra folder:              {e['dir']} ({len(e['files'])} files)")
     print(f"  global OpenSpec config:    {gpath if global_info['existed'] else 'none'}")
     print(f"  OpenSpec CLI:              {manifest['openspec_version'] or 'not installed'}")
     if in_git:
@@ -187,6 +207,23 @@ def cmd_restore(root: Path, snap: Path, yes: bool, dry_run: bool, restore_global
     for rel in skipped_tracked:
         print(f"skipped (now tracked by git - restore it with git): {rel}")
 
+    extra_changes = False
+    for i, e in enumerate(manifest.get("extra_dirs", [])):
+        folder = Path(e["dir"])
+        want: dict[str, str] = e["files"]
+        writes = sorted(r for r, d in want.items() if not (folder / r).is_file() or sha256(folder / r) != d)
+        deletes = sorted(extra_files(folder) - set(want))
+        extra_changes |= bool(writes or deletes)
+        for rel in writes:
+            print(f"{verb}restore: {folder / rel}")
+            if apply:
+                (folder / rel).parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(snap / "extra" / str(i) / rel, folder / rel)
+        for rel in deletes:
+            print(f"{verb}delete (not in snapshot): {folder / rel}")
+            if apply:
+                (folder / rel).unlink()
+
     g = manifest["global_config"]
     gpath = Path(g["path"]) if g.get("path") else None
     global_differs = False
@@ -218,7 +255,7 @@ def cmd_restore(root: Path, snap: Path, yes: bool, dry_run: bool, restore_global
     if git.get("repo"):
         print(f"Tracked files: use git. The snapshot was taken on {git.get('branch') or '(detached)'} @ {git.get('head')}.")
 
-    changes = bool(to_write or to_delete or (global_differs and restore_global))
+    changes = bool(to_write or to_delete or extra_changes or (global_differs and restore_global))
     if not changes and not global_differs:
         print("Untracked footprint matches the snapshot - nothing to restore.")
         return 0
@@ -235,6 +272,8 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("save", help="save untracked footprint + global config")
     s.add_argument("--out", type=Path, help="snapshot directory (default ~/.vsdd-snapshots/<project>-<time>)")
+    s.add_argument("--extra-dir", type=Path, action="append", default=[],
+                   help="also save OpenSpec files in this folder (e.g. ~/.minimax). Repeatable")
     sub.add_parser("latest", help="print this project's newest snapshot directory")
     r = sub.add_parser("restore", help="restore a snapshot")
     r.add_argument("snapshot", type=Path)
@@ -244,7 +283,8 @@ def main() -> int:
     args = ap.parse_args()
     root = args.root.resolve()
     if args.cmd == "save":
-        return cmd_save(root, args.out.resolve() if args.out else None)
+        return cmd_save(root, args.out.resolve() if args.out else None,
+                        [d.expanduser().resolve() for d in args.extra_dir])
     if args.cmd == "latest":
         return cmd_latest(root)
     return cmd_restore(root, args.snapshot.resolve(), args.yes, args.dry_run, args.restore_global)

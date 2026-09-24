@@ -69,6 +69,7 @@ exact for the installed CLI version:
 | `Tools to add: …` | Requested tools that aren't set up in this project yet | Step 1 |
 | `Configured schema: … <- CUSTOM` | The project uses its own schema | Step 3 (ASK) |
 | `In-flight change: …` | Changes created before VSDD. They keep their schema | Step 9 report |
+| `Home-folder tool: <tool> installs skills in ~/…` | That tool keeps its OpenSpec skills in the user's home folder (MiniMax: `~/.minimax`). Patching it affects every project on the machine | **ASK** before touching it. If yes, pass `--extra-dir <folder>` to the snapshot (below) and to the overlay (Step 5) |
 | `(not an OpenSpec tool folder …)` | A folder with copies of OpenSpec skills that OpenSpec doesn't manage | Step 5 patches it too. Mention it in the report |
 
 **Detect an earlier VSDD install:**
@@ -98,6 +99,7 @@ grep -rli "diagram" "$ROOT"/.*/skills/openspec-*/SKILL.md 2>/dev/null | head -3
 
    ```bash
    python3 "$KIT"/files/scripts/vsdd/vsdd_snapshot.py --root "$ROOT" save
+   # plus --extra-dir <folder> for each home-folder tool the user approved, e.g. --extra-dir ~/.minimax
    ```
 
    Note the printed snapshot directory. It is stored outside the project, under
@@ -289,7 +291,19 @@ is in `TOOLS`, `grep -n "@AGENTS.md" "$ROOT"/CLAUDE.md` prints a line too.
 ```bash
 cd "$ROOT" && python3 scripts/vsdd/install_overlay.py --dry-run
 python3 scripts/vsdd/install_overlay.py
+# plus --extra-dir <folder> for each approved home-folder tool (same folders as the snapshot)
 ```
+
+The overlay handles every OpenSpec tool layout:
+- Skills live in `<tool folder>/skills/openspec-*/`.
+- Commands come in many forms: `.claude/commands/opsx/*.md`,
+  `.github/prompts/opsx-*.prompt.md`, `.gemini/commands/opsx/*.toml`,
+  `.continue/prompts/opsx-*.prompt`, and more.
+- Some tools keep commands in a separate folder from their skills (Kilo: `.kilo/`,
+  Cline: `.clinerules/`). Their wrappers point at the tool's own patched skills, or
+  the shared `.agents/skills/`.
+- Codex, Antigravity, Zed and the generic `agents` target all share `.agents/`.
+- Codex has skills but no commands.
 
 What it does, for every tool folder (`.claude`, `.opencode`, `.qwen`, ...):
 
