@@ -52,6 +52,25 @@ Decide:
 - **Choosing `TOOLS`**: tool folders that already exist (`.claude`, `.opencode`,
   `.qwen`, ...) are strong hints. **ASK** the user to confirm the list.
 
+**Inspect an existing OpenSpec setup** (after `TOOLS` is confirmed). This runs from
+the kit, because the project doesn't have the scripts yet:
+
+```bash
+python3 "$KIT"/files/scripts/vsdd/openspec_preflight.py --root "$ROOT" --tools <TOOLS comma-separated>
+```
+
+It reports what Step 1 needs to know, and asks OpenSpec itself, so the answers are
+exact for the installed CLI version:
+
+| Report line | Meaning | Where it's handled |
+|---|---|---|
+| `Project initialised: no` | Fresh install | Step 1, `init` branch |
+| `!! openspec update would DELETE: …` | Workflows installed in the project are missing from the user's **global** OpenSpec profile, so a plain `openspec update` removes their skills and commands | Step 1 (ASK) |
+| `Tools to add: …` | Requested tools that aren't set up in this project yet | Step 1 |
+| `Configured schema: … <- CUSTOM` | The project uses its own schema | Step 3 (ASK) |
+| `In-flight change: …` | Changes created before VSDD. They keep their schema | Step 9 report |
+| `(not an OpenSpec tool folder …)` | A folder with copies of OpenSpec skills that OpenSpec doesn't manage | Step 5 patches it too. Mention it in the report |
+
 **Detect an earlier VSDD install:**
 
 ```bash
@@ -79,10 +98,31 @@ and `python3` works.
   openspec init --tools <TOOLS comma-separated> "$ROOT"
   ```
 
-- **`ROOT/openspec/` exists:** run `openspec update "$ROOT"`. This regenerates the
-  stock skills and commands for the configured tools and **overwrites any edits to
-  them**. The overlay in Step 5 re-applies the VSDD additions. If you found
-  hand-edited skills in Step 0, do Step 1b **first**.
+- **`ROOT/openspec/` exists:** OpenSpec is already set up. **Don't run `init` over
+  it for the existing tools, and don't run a plain `update` until you've checked
+  the preflight report.** If you found hand-edited skills in Step 0, do Step 1b
+  **first**.
+  1. **If the report shows `openspec update would DELETE: …`**, **ASK** the user,
+     explaining that those workflows' skills and commands would be removed:
+     - **(Recommended)** they add the workflows to their global profile themselves,
+       by running `openspec config profile` in a terminal (it's interactive, and
+       their global setting). Re-run the preflight until the line is gone, then run
+       `openspec update "$ROOT"`.
+     - Or keep the profile as it is and run
+       `python3 "$KIT"/files/scripts/vsdd/openspec_preflight.py --root "$ROOT" --safe-update`.
+       It runs `update` with a temporary config that keeps every installed
+       workflow, and doesn't touch their global config. Tell the user that any
+       later plain `openspec update` will still delete them.
+     - Or accept the deletion. Only do this if the user explicitly says so.
+  2. **Otherwise**, run `openspec update "$ROOT"`.
+
+  `update` regenerates the stock skills and commands for the tools already set
+  up, and **overwrites any edits to them**. The overlay in Step 5 re-applies the
+  VSDD additions.
+  3. **If the report shows `Tools to add: …`**, add them with
+     `openspec init --tools <those tools> "$ROOT"`. On a project that is already
+     set up, `init` only adds the new tools: it leaves `openspec/config.yaml` and
+     the other tools' skills alone.
 
 ### Step 1b — Hand-edited skills (only if Step 0 found them)
 
@@ -93,14 +133,18 @@ and `python3` works.
    every customisation that is **not** diagram-related.
 3. **ASK** the user whether those non-diagram customisations should be kept. If yes,
    re-apply them by hand after Step 5.
-4. Run `openspec update --force "$ROOT"` to restore stock skills.
+4. Restore stock skills: `openspec update --force "$ROOT"`. If the preflight
+   reported workflows that `update` would delete, handle that first, as in Step 1.
 
 **Verify:**
 
 ```bash
 openspec list            # runs without error
-ls "$ROOT"/.*/skills/ | grep openspec-   # stock skills exist for each tool
+python3 "$KIT"/files/scripts/vsdd/openspec_preflight.py --root "$ROOT" --tools <TOOLS>
 ```
+
+The preflight must show no `Tools to add`. It must show every workflow the project
+had before this step, unless the user agreed to lose some.
 
 ---
 
@@ -116,6 +160,7 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 | `scripts/vsdd/validate_mermaid.py` | `scripts/vsdd/validate_mermaid.py` | Overwrite |
 | `scripts/vsdd/install_overlay.py` | `scripts/vsdd/install_overlay.py` | Overwrite |
 | `scripts/vsdd/merge_diagrams.py` | `scripts/vsdd/merge_diagrams.py` | Overwrite |
+| `scripts/vsdd/openspec_preflight.py` | `scripts/vsdd/openspec_preflight.py` | Overwrite |
 
 ```bash
 mkdir -p "$ROOT"/openspec/schemas "$ROOT"/docs "$ROOT"/scripts/vsdd
@@ -155,7 +200,17 @@ as a backstop that re-states the diagram steps if the skill overlay is ever wipe
   4–8 lines of facts agents need. Don't invent conventions you can't see in the
   code.
 - **`config.yaml` exists:**
-  1. Set `schema: visual-driven`.
+  1. Set `schema: visual-driven`, **unless the preflight flagged a custom schema.**
+     In that case, **ASK**:
+     - **(a)** switch to `visual-driven`, losing the custom artifacts from new
+       changes; or
+     - **(b)** keep their schema, and add VSDD to it by copying the `diagrams`
+       artifact from `openspec/schemas/visual-driven/schema.yaml`: its template and
+       instruction, `requires: [proposal]`, and making their next artifact require
+       `diagrams`. Then check it with `openspec schema validate <their schema>`; or
+     - **(c)** stop.
+
+     Never replace a custom schema without asking.
   2. If it has a `prompts:` key, it has been ignored. **ASK** whether to rename it to
      `rules:`, and show the user its contents first: enabling stale rules can do more
      harm than having none.
@@ -336,6 +391,8 @@ Reply with:
 - Source of Truth: <files and stable section names>
 - CI: <added .github/workflows/vsdd.yml | skipped | instructions given>
 - Smoke test: passed, removed
+- In-flight changes: <list from the preflight, or "none">. They keep their original
+  schema, so they have no diagrams.md and their archive does no diagram merge
 - Decisions I made: <list>
 - Needs your attention: <anything skipped, failed, or deferred>
 
@@ -351,6 +408,7 @@ Then suggest the user commit everything as a single commit, for example
 
 | Event | Action |
 |---|---|
+| About to run `openspec update` | Run `python3 scripts/vsdd/openspec_preflight.py` first. If it would delete workflows, use `--safe-update` instead, or add them to your profile |
 | `openspec update` or `openspec init` was run | `python3 scripts/vsdd/install_overlay.py`. CI's `--check` catches a forgotten run |
 | OpenSpec upgraded to a new minor or major version | Run the overlay with `--dry-run` first. On `anchor not found`, see Step 5 |
 | A new AI tool is added | `openspec update` (after adding the tool via `openspec init --tools`), then the overlay |
@@ -367,6 +425,8 @@ Then suggest the user commit everything as a single commit, for example
 | Validator: "Before ... is not a verbatim copy" | The Before section was edited, or the Source of Truth changed after the change was proposed | Re-copy the section from the file the Placement row names. If the Source of Truth really changed, re-check that the After State still applies |
 | Validator: "... has no Placement row" | A Before or After section isn't listed in `## Placement` | Add a row (update / add / move from / remove), or delete the stray section |
 | Rendered sequence diagram shows `"Name"` with quotes | Quoted participant alias | Remove the quotes (`participant A as Name`) |
+| Skills or `/opsx` commands (continue, ff, …) disappeared after `openspec update` | They weren't in the global OpenSpec profile | Add them with `openspec config profile`, then run `openspec update` again. Next time, run `openspec_preflight.py` first |
+| A tool's skills were never created | `openspec update` only refreshes tools that are already set up | `openspec init --tools <tool> .` (safe on an existing project) |
 | `openspec archive` used directly | The CLI has no diagram merge | Run `python3 scripts/vsdd/merge_diagrams.py openspec/changes/archive/<dated-name>` (see `docs/VSDD.md` §4) |
 | `merge_diagrams.py` refuses: "not a verbatim copy" | The Source of Truth changed after the change was proposed (e.g. another change archived first) | Re-copy the Before sections from the current Source of Truth, re-check that the After State still makes sense, then merge again |
 

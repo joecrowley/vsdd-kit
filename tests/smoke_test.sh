@@ -174,6 +174,44 @@ openspec update --force . </dev/null >/dev/null 2>&1 || fail "openspec update"
 python3 scripts/vsdd/install_overlay.py --check >/dev/null && fail "wipe not detected" || pass "wipe detected by --check"
 python3 scripts/vsdd/install_overlay.py >/dev/null && python3 scripts/vsdd/install_overlay.py --check >/dev/null && pass "overlay restored" || fail "overlay restore"
 
+step "Existing OpenSpec: preflight, safe update, adding a tool"
+ROOT2="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-existing.XXXXXX")"
+XFULL="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-full.XXXXXX")"
+XLESS="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-less.XXXXXX")"
+[ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT" "$XDG" "$ROOT2" "$XFULL" "$XLESS"' EXIT
+mkdir -p "$XFULL/openspec" "$XLESS/openspec"
+printf '{"profile":"custom","telemetry":{"noticeSeen":true},"workflows":["propose","explore","new","continue","update","ff","apply","sync","archive","bulk-archive","verify","onboard"]}\n' > "$XFULL/openspec/config.json"
+printf '{"profile":"custom","telemetry":{"noticeSeen":true},"workflows":["propose","explore","apply","sync","archive","verify"]}\n' > "$XLESS/openspec/config.json"
+PRE="$KIT/files/scripts/vsdd/openspec_preflight.py"
+cd "$ROOT2"; git init -q
+XDG_CONFIG_HOME="$XFULL" openspec init --tools claude . </dev/null >/dev/null 2>&1 || fail "init (full profile)"
+printf 'schema: team-schema\ncontext: |\n  existing project\n' > openspec/config.yaml
+mkdir -p openspec/changes/old-change && printf 'schema: spec-driven\ncreated: 2026-01-01\n' > openspec/changes/old-change/.openspec.yaml
+BEFORE_N=$(ls -d .claude/skills/openspec-* | wc -l | tr -d ' ')
+cp openspec/config.yaml "$ROOT2/config.bak"
+REPORT="$(XDG_CONFIG_HOME="$XLESS" python3 "$PRE" --tools claude,opencode --json || true)"
+field() { python3 -c "import json,sys;d=json.loads(sys.argv[1]);print(d$2)" "$REPORT"; }
+PREDICTED="$(field "$REPORT" "['update_would_remove']")"
+[ "$PREDICTED" != "[]" ] && pass "preflight predicts deletions: $PREDICTED" || fail "preflight predicted no deletions"
+[ "$(field "$REPORT" "['tools_to_add']")" = "['opencode']" ] && pass "preflight reports tool to add: opencode" || fail "tools_to_add wrong"
+[ "$(field "$REPORT" "['custom_schema']")" = "True" ] && pass "preflight flags custom schema" || fail "custom schema not flagged"
+[ "$(field "$REPORT" "['in_flight_changes'][0]['schema']")" = "spec-driven" ] && pass "preflight lists in-flight change with its schema" || fail "in-flight change not reported"
+XDG_CONFIG_HOME="$XLESS" python3 "$PRE" --safe-update >/dev/null || fail "safe update failed"
+[ "$(ls -d .claude/skills/openspec-* | wc -l | tr -d ' ')" = "$BEFORE_N" ] && pass "--safe-update kept all $BEFORE_N workflows" || fail "--safe-update lost workflows"
+cmp -s openspec/config.yaml "$ROOT2/config.bak" && pass "--safe-update left config.yaml (custom schema) alone" || fail "config.yaml changed by update"
+XDG_CONFIG_HOME="$XLESS" openspec init --tools opencode . </dev/null >/dev/null 2>&1 || fail "init --tools opencode"
+[ -d .opencode/skills/openspec-propose ] && [ "$(ls -d .claude/skills/openspec-* | wc -l | tr -d ' ')" = "$BEFORE_N" ] \
+  && cmp -s openspec/config.yaml "$ROOT2/config.bak" \
+  && pass "init on existing project added opencode, kept claude skills and config" || fail "init --tools changed existing setup"
+XDG_CONFIG_HOME="$XLESS" openspec update . </dev/null >/dev/null 2>&1 || fail "plain update"
+GONE="$(python3 -c "
+import sys; from pathlib import Path
+sys.path.insert(0, '$KIT/files/scripts/vsdd'); from openspec_preflight import installed_skills
+left = installed_skills(Path('.')).get('.claude', set())
+print(sorted(set($PREDICTED) - left) == sorted($PREDICTED) and not (set($PREDICTED) & left))")"
+[ "$GONE" = "True" ] && pass "plain update deleted exactly the predicted workflows (the risk is real)" || fail "prediction did not match plain update"
+cd "$ROOT"
+
 printf '\n\033[32mAll checks passed.\033[0m\n'
 [ -n "${KEEP:-}" ] && echo "Project kept at $ROOT"
 exit 0

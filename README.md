@@ -153,7 +153,7 @@ python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay wa
 | `.<tool>/skills/openspec-*` | Stock OpenSpec skills with the VSDD steps inserted, each marked `<!-- vsdd:… -->` |
 | `openspec/config.yaml` `operations` | The key VSDD steps, repeated as CLI guidance (newer OpenSpec) |
 | `.<tool>/command*/opsx-*` | Thin wrappers that load those skills |
-| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before), `merge_diagrams.py` (the archive merge, deterministic), `install_overlay.py` |
+| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before), `merge_diagrams.py` (the archive merge, deterministic), `install_overlay.py`, `openspec_preflight.py` (what `openspec update` would delete, tools to add) |
 | `.github/workflows/vsdd.yml` | CI: render every diagram and check the overlay (optional) |
 
 ## Design notes
@@ -192,13 +192,22 @@ the quotes show up in the rendered output. The validator enforces all of these, 
 
 | When | Do |
 |---|---|
+| Before `openspec update` | `python3 scripts/vsdd/openspec_preflight.py`. If it would delete workflows, use `--safe-update` or add them to your profile |
 | After `openspec init` / `openspec update` | `python3 scripts/vsdd/install_overlay.py` |
 | After upgrading OpenSpec | Run `tests/smoke_test.sh` in this repo. On `anchor not found`, update the anchors in `install_overlay.py` |
 | When adding an AI tool | `openspec init --tools <tool>`, then the overlay |
 
 > **Caution:** `openspec update` also **removes** skills for workflows missing from
-> your global OpenSpec profile (`openspec config list`). Add every workflow you use
-> with `openspec config profile` before updating.
+> your global OpenSpec profile (`openspec config list`). `openspec_preflight.py`
+> tells you exactly which ones, and `--safe-update` updates without deleting them.
+> The lasting fix is adding every workflow you use with `openspec config profile`.
+
+**Installing into a project that already uses OpenSpec** is supported. The runbook
+runs the preflight first. It keeps your specs, changes and `config.yaml` entries,
+asks before replacing a custom schema, never deletes workflows without asking, and
+adds any new tools with `openspec init --tools`, which leaves the rest alone.
+Changes already in flight keep their original schema, so they get no diagram
+merge.
 
 ## Testing the kit
 
@@ -219,6 +228,12 @@ OpenSpec, and checks every Verify condition:
   inconsistent Placement table, and a Before copy that isn't verbatim
 - the archive merge: update, add, move and remove, idempotency, and refusing to merge
   when the Source of Truth changed after the change was proposed
+- an **existing OpenSpec** project with a reduced global profile:
+  - the preflight predicts the deletions, the tool to add, the custom schema, and
+    an in-flight change;
+  - `--safe-update` keeps every workflow;
+  - `init --tools` adds a tool without touching the setup;
+  - a plain `update` deletes exactly what was predicted.
 - recovery after `openspec update`
 
 By default it uses an isolated OpenSpec config with **every workflow enabled**, so the
@@ -240,7 +255,7 @@ vsdd-kit/
     ├── openspec/                ← schema, templates, config example, Source of Truth skeleton
     ├── docs/                    ← VSDD.md, MERMAID_RULES.md
     ├── agents/                  ← AGENTS.md section, CLAUDE.md example
-    ├── scripts/vsdd/            ← install_overlay.py, validate_mermaid.py, merge_diagrams.py
+    ├── scripts/vsdd/            ← install_overlay.py, validate_mermaid.py, merge_diagrams.py, openspec_preflight.py
     └── ci/github/vsdd.yml       ← GitHub Actions workflow
 ```
 
