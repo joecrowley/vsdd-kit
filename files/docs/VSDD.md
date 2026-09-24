@@ -18,8 +18,13 @@ a change. Read `docs/MERMAID_RULES.md` before drawing any diagram.
 - **Ownership:** a diagram belongs to the capability whose behaviour it shows. It
   goes in the architecture file only when it spans capabilities (the module
   hierarchy, a state holder shared by several features, system topology). When a
-  change **creates a capability**, check whether any existing architecture
-  diagram now shows only that capability's behaviour. If one does, move it (§2).
+  change **creates a capability**, its new flows go in that capability's file,
+  and any existing architecture diagram that now shows only that capability's
+  behaviour moves there (§2).
+- Putting a diagram **into** the architecture file (`add`, or `move from` another
+  file) needs a reason in the Placement table's `Why here` column, saying which
+  capabilities it spans. The validator enforces this, and warns when the change
+  creates a capability but still adds to the architecture file.
 
 ## 2. The change artifact: `diagrams.md`
 
@@ -32,13 +37,16 @@ Pipeline (schema `visual-driven`): `proposal → diagrams → specs → design �
    the change touches:
 
    ```markdown
-   | Stable name | Source of Truth file | Action |
-   |---|---|---|
-   | Status Update Flow | specs/reading-status-update/diagrams.md | move from specs/architecture/diagrams.md |
-   | ReadingListState Machine | specs/architecture/diagrams.md | update |
+   | Stable name | Source of Truth file | Action | Why here |
+   |---|---|---|---|
+   | Status Update Flow | specs/reading-status-update/diagrams.md | move from specs/architecture/diagrams.md | |
+   | ReadingListState Machine | specs/architecture/diagrams.md | update | |
+   | Sync Topology | specs/architecture/diagrams.md | add | Shared by reading-list and book-notes |
    ```
 
-   Paths are relative to `openspec/`.
+   Paths are relative to `openspec/`. `Why here` is required only for rows that
+   `add` or `move` a diagram into `specs/architecture/diagrams.md`. Leave it empty,
+   or leave the column out, otherwise.
 
    | Action | Before State | After State | Archive merge |
    |---|---|---|---|
@@ -54,7 +62,10 @@ Pipeline (schema `visual-driven`): `proposal → diagrams → specs → design �
    Keep existing stable names unchanged. A removed diagram has no After section.
 
 The validator checks that the Placement table matches the Before and After sections,
-and that each Before copy is verbatim.
+that each Before copy is verbatim, and that architecture-file additions have a
+`Why here`. It prints a **warning** (which does not fail the run) when the change
+creates a capability but still adds or moves a diagram into the architecture file:
+review that row.
 
 ## 3. Deviations
 
@@ -114,6 +125,8 @@ python3 scripts/vsdd/validate_mermaid.py --render   # also parse with mermaid-cl
 ```
 
 For an active change, the validator also checks the `## Placement` table against the
-Before and After sections, and that each Before copy is still verbatim.
+Before and After sections, that each Before copy is still verbatim, and that
+architecture-file additions give a `Why here`. Ownership warnings are printed as
+`warning:` lines and don't change the exit code.
 
 Run it after editing any `diagrams.md`. CI runs it on every push.

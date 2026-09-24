@@ -18,6 +18,12 @@ Structure checks (active change diagrams.md files):
     Before and After `### <Stable Name>` sections, and vice versa
   - Before sections are verbatim copies of the Source of Truth file the row names
     (checked for active changes only - archived ones describe an older state)
+  - a row that adds or moves a diagram INTO specs/architecture/diagrams.md has a
+    4th column, `Why here`, saying why it spans capabilities
+
+Ownership warnings (active changes; printed, but they don't fail the run):
+  - the change creates a capability (it has specs/<cap>/ and openspec/specs/<cap>/
+    doesn't exist yet) and still adds or moves a diagram into the architecture file
 
 Usage:
   python3 scripts/vsdd/validate_mermaid.py                 # openspec/specs + active changes
@@ -99,6 +105,7 @@ def lint_block(start: int, block: list[str]) -> list[tuple[int, str]]:
 
 
 PLACEMENT_ACTION_RE = re.compile(r"^(update|add|remove|move from\s+(\S+))$")
+ARCHITECTURE_FILE = "specs/architecture/diagrams.md"
 
 
 def _sections(lines: list[str], level: str) -> list[tuple[str, int, str]]:
@@ -122,20 +129,36 @@ def _sections(lines: list[str], level: str) -> list[tuple[str, int, str]]:
     return out
 
 
-def _parse_placement(body: str) -> tuple[list[tuple[str, str, str, str | None]], list[str]]:
-    """Return ([(name, file, action, move_from)], [errors]) from a Placement table."""
-    rows, errors = [], []
+def _placement_cells(body: str) -> list[tuple[str, list[str]]]:
+    """(raw line, cells) for each table row of a Placement section, header and rule excluded."""
+    out = []
     for raw in body.splitlines():
         line = raw.strip()
         if not line.startswith("|") or set(line) <= set("|-: "):
             continue
         cells = [c.strip().strip("`") for c in line.strip("|").split("|")]
-        if len(cells) != 3:
-            errors.append(f"Placement row needs 3 columns: {line}")
+        if cells and cells[0].lower() == "stable name":
             continue
-        name, target, action = cells
-        if name.lower() == "stable name":
+        out.append((line, cells))
+    return out
+
+
+def _placement_reasons(body: str) -> dict[str, str]:
+    """{stable name: 'Why here' text} from the optional 4th Placement column."""
+    return {cells[0]: cells[3] for _, cells in _placement_cells(body) if len(cells) == 4}
+
+
+def _parse_placement(body: str) -> tuple[list[tuple[str, str, str, str | None]], list[str]]:
+    """Return ([(name, file, action, move_from)], [errors]) from a Placement table.
+
+    Columns: Stable name | Source of Truth file | Action [| Why here].
+    """
+    rows, errors = [], []
+    for line, cells in _placement_cells(body):
+        if len(cells) not in (3, 4):
+            errors.append(f"Placement row needs 3 or 4 columns: {line}")
             continue
+        name, target, action = cells[:3]
         m = PLACEMENT_ACTION_RE.match(action)
         if not m:
             errors.append(f"Placement '{name}': action must be update, add, remove or 'move from <file>'")
@@ -173,6 +196,12 @@ def check_change_structure(path: Path, lines: list[str], root: Path, verify_befo
     errors += [(placement_line, e) for e in row_errors]
     if not rows and not row_errors:
         errors.append((placement_line, "Placement table has no rows"))
+    reasons = _placement_reasons(h2["Placement"][1])
+    for name, target, action, _ in rows:
+        if target == ARCHITECTURE_FILE and action in ("add", "move") and not reasons.get(name):
+            errors.append((placement_line, f"'{name}' ({action}) goes into the architecture file: add a 4th "
+                           "column 'Why here' saying which capabilities it spans, or place it in "
+                           "specs/<capability>/diagrams.md"))
 
     before_line, _ = h2["Before State"]
     after_line, _ = h2["After State"]
@@ -216,6 +245,34 @@ def check_change_structure(path: Path, lines: list[str], root: Path, verify_befo
     return errors
 
 
+def new_capabilities(change_dir: Path, root: Path) -> list[str]:
+    """Capabilities this change creates: specs/<cap>/ in the change, not yet in openspec/specs/."""
+    specs = change_dir / "specs"
+    if not specs.is_dir():
+        return []
+    return sorted(d.name for d in specs.iterdir()
+                  if d.is_dir() and not (root / "openspec" / "specs" / d.name).exists())
+
+
+def ownership_warnings(path: Path, lines: list[str], root: Path) -> list[tuple[int, str]]:
+    """Warn when a change creates a capability but places a new diagram in the architecture file."""
+    h2 = {n: (ln, body) for n, ln, body in _sections(lines, "##")}
+    if "Placement" not in h2:
+        return []
+    caps = new_capabilities(path.parent, root)
+    if not caps:
+        return []
+    rows, _ = _parse_placement(h2["Placement"][1])
+    reasons = _placement_reasons(h2["Placement"][1])
+    owner = " or ".join(f"specs/{c}/diagrams.md" for c in caps)
+    return [(h2["Placement"][0],
+             f"this change creates {', '.join(caps)}, but '{name}' ({action}) goes into the architecture "
+             f"file. A diagram belongs to the capability whose behaviour it shows - check whether it "
+             f"belongs in {owner} (Why here: {reasons.get(name) or '-'})")
+            for name, target, action, _ in rows
+            if target == ARCHITECTURE_FILE and action in ("add", "move")]
+
+
 def render_blocks(items: list[tuple[Path, int, list[str]]]) -> list[tuple[Path, int, str]]:
     mmdc = shutil.which("mmdc")
     if not mmdc:
@@ -252,6 +309,7 @@ def main() -> int:
     root = args.root.resolve()
     files = [p.resolve() for p in args.paths] if args.paths else find_files(root, args.include_archive)
     problems: list[tuple[Path, int, str]] = []
+    warnings: list[tuple[Path, int, str]] = []
     to_render: list[tuple[Path, int, list[str]]] = []
     block_count = 0
 
@@ -268,18 +326,25 @@ def main() -> int:
             archived = "archive" in path.parts[path.parts.index("changes"):]
             if not (archived and args.include_archive and not args.strict_archive):
                 problems += [(path, n, msg) for n, msg in check_change_structure(path, lines, root, not archived)]
+            if not archived:
+                warnings += [(path, n, msg) for n, msg in ownership_warnings(path, lines, root)]
 
     if args.render and to_render:
         problems += render_blocks(to_render)
 
-    for path, line, msg in sorted(problems, key=lambda p: (str(p[0]), p[1])):
+    def show(path: Path) -> Path:
         try:
-            shown = path.relative_to(root)
+            return path.relative_to(root)
         except ValueError:
-            shown = path
-        print(f"{shown}:{line}: {msg}")
+            return path
+
+    for path, line, msg in sorted(problems, key=lambda p: (str(p[0]), p[1])):
+        print(f"{show(path)}:{line}: {msg}")
+    for path, line, msg in sorted(warnings, key=lambda p: (str(p[0]), p[1])):
+        print(f"{show(path)}:{line}: warning: {msg}")
     status = "FAIL" if problems else "OK"
     print(f"{status}: {len(files)} files, {block_count} mermaid blocks, {len(problems)} problems"
+          + (f", {len(warnings)} warnings" if warnings else "")
           + (" (rendered)" if args.render else ""))
     return 1 if problems else 0
 

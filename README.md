@@ -44,8 +44,10 @@ flowchart LR
    data flow, topology or a schema changes.
 2. **Placement and Before/After.** A `## Placement` table names each diagram the change
    touches, which Source of Truth file it lives in, and the action: `update`, `add`,
-   `move from <file>` or `remove`. The Before state is copied **verbatim** from that
-   file, which the validator checks. The After state proposes the change under the
+   `move from <file>` or `remove`. Diagrams live with the capability they describe:
+   adding one to the cross-cutting architecture file needs a `Why here` reason, and
+   the validator warns when a new capability's flow lands there. The Before state is
+   copied **verbatim** from that file, which the validator checks. The After state proposes the change under the
    **same stable section names**.
 3. **Diagrams checked against the code.** During apply and verify, the agent confirms
    that every node and edge in the After state exists in the code. Where they differ,
@@ -231,7 +233,8 @@ OpenSpec, and checks every Verify condition:
 - the `operations` backstop, when the CLI supports `instructions archive`
 - overlay apply, idempotency, command wrapping, and every patched skill for each tool
 - diagram validation, including deliberately broken cases: bad Mermaid, a missing or
-  inconsistent Placement table, and a Before copy that isn't verbatim
+  inconsistent Placement table, a Before copy that isn't verbatim, and a new
+  capability's flow added to the architecture file without a reason
 - the archive merge: update, add, move and remove, idempotency, and refusing to merge
   when the Source of Truth changed after the change was proposed
 - an **existing OpenSpec** project with a reduced global profile:

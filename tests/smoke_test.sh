@@ -140,6 +140,18 @@ printf '## Diagram needed?\n\nmaybe\n' > "$C"
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && fail "bad gate not caught" || pass "bad gate caught"
 printf '## Diagram needed?\n\nNO - smoke test\n' > "$C"
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "NO gate passes" || fail "NO gate rejected"
+write_owner() {  # $1 = Why here text ('' = none): the change creates smoke-cap but adds its flow to architecture
+  mkdir -p openspec/changes/vsdd-smoke-test/specs/smoke-cap
+  printf '## Diagram needed?\n\nYES - ownership\n\n## Placement\n\n| Stable name | Source of Truth file | Action | Why here |\n|---|---|---|---|\n'  > "$C"
+  printf '| Smoke Flow | specs/architecture/diagrams.md | add | %s |\n\n## Before State\n\n## After State\n\n' "$1" >> "$C"
+  printf '### Smoke Flow\nSmoke test flow.\n\n```mermaid\nflowchart LR\n    S["smoke"] --> T["test"]\n```\n' >> "$C"
+}
+write_owner ""
+grep -q "Why here" <<<"$(python3 scripts/vsdd/validate_mermaid.py 2>&1 || true)" && pass "architecture add without a reason caught" || fail "architecture add without a reason not caught"
+write_owner "spans smoke-cap and reading"
+OUT="$(python3 scripts/vsdd/validate_mermaid.py 2>&1)" && grep -q "warning: this change creates smoke-cap" <<<"$OUT" \
+  && pass "new-capability flow in architecture file passes with a warning" || fail "ownership warning missing, or reason not accepted"
+rm -rf openspec/changes/vsdd-smoke-test/specs
 
 step "8b. archive merge (merge_diagrams.py)"
 cp "$SOT" "$ROOT/sot.bak"

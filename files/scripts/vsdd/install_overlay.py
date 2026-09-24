@@ -39,10 +39,12 @@ GEN_DIAGRAMS = """\
   a state machine, data flow, infrastructure topology, or a data schema.
   - NO: write `NO - <one-line reason>` and stop. No other sections.
   - YES: read `docs/VSDD.md` sections 1-2, then add a `## Placement` table
-    (Stable name | Source of Truth file | Action) with one row per diagram touched.
-    Action is update, add, `move from <old file>` or remove. Diagrams belong to the
-    capability whose behaviour they show. If the change creates a capability,
-    consider moving its flows into `specs/<capability>/diagrams.md`.
+    (Stable name | Source of Truth file | Action | Why here) with one row per diagram
+    touched. Action is update, add, `move from <old file>` or remove. Diagrams belong
+    to the capability whose behaviour they show: if the change creates a capability,
+    its new flows go in `specs/<capability>/diagrams.md`. A row that adds or moves a
+    diagram into `specs/architecture/diagrams.md` must name, in `Why here`, the
+    capabilities it spans.
   - Copy the Before sections VERBATIM from the files the rows name, then write the
     After sections under the SAME stable names. Removed diagrams have no After.
 - Read `docs/MERMAID_RULES.md` before drafting any diagram. Then run

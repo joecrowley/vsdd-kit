@@ -17,8 +17,12 @@ YES
      Source of Truth file: a path under openspec/, e.g. specs/architecture/diagrams.md
      (cross-cutting) or specs/<capability>/diagrams.md (capability-owned).
      Ownership: a diagram belongs to the capability whose behaviour it shows. If
-     this change CREATES a capability, decide whether its flows belong in that
-     capability's own diagrams.md - if an existing diagram now belongs there, move it.
+     this change CREATES a capability, its new flows go in that capability's own
+     diagrams.md - and if an existing diagram now belongs there, move it.
+
+     Why here: REQUIRED when the row adds or moves a diagram INTO
+     specs/architecture/diagrams.md - say which capabilities it spans. Leave it
+     empty for every other row.
 
      Action:
        update                 - replace the section. Before copied from that file.
@@ -28,9 +32,9 @@ YES
        remove                 - delete the section (and the file if nothing is left).
                                 Before copied from that file. NO After section. -->
 
-| Stable name | Source of Truth file | Action |
-|---|---|---|
-| <Stable Name> | specs/architecture/diagrams.md | update |
+| Stable name | Source of Truth file | Action | Why here |
+|---|---|---|---|
+| <Stable Name> | specs/<capability>/diagrams.md | update | |
 
 ## Before State
 

@@ -60,14 +60,18 @@ artifacts:
 
 
       Step 3 - If YES, decide placement and record it in `## Placement` (a table:
-      Stable name | Source of Truth file | Action), one row per diagram touched:
+      Stable name | Source of Truth file | Action | Why here), one row per diagram
+      touched:
       - Source of Truth files live under openspec/: capability-owned diagrams in
       `specs/<capability>/diagrams.md`, cross-cutting ones in
       `specs/architecture/diagrams.md`. A diagram belongs to the capability whose
       behaviour it shows.
-      - If this change CREATES a capability, decide whether its flows belong in
-      that capability's own diagrams.md. If an existing cross-cutting diagram now
+      - If this change CREATES a capability, its new flows go in that
+      capability's own diagrams.md. If an existing cross-cutting diagram now
       shows only that capability's behaviour, move it there.
+      - `Why here` is REQUIRED for a row that adds or moves a diagram INTO
+      `specs/architecture/diagrams.md`: name the capabilities it spans. Leave it
+      empty otherwise. The validator rejects architecture additions without it.
       - Action is one of: `update` (replace), `add` (new diagram), `move from
       <old file>` (delete from the old file, add to this one), `remove` (delete).
 

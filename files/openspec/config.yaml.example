@@ -23,7 +23,7 @@ rules:
     - "List every module/package the change touches in the Impact section."
   diagrams:
     - "Read `docs/VSDD.md` and `docs/MERMAID_RULES.md` before drafting any diagram."
-    - "For a YES gate, add a `## Placement` table (Stable name | Source of Truth file | Action: update, add, move from <old file>, remove). Diagrams belong to the capability whose behaviour they show. When the change creates a capability, consider moving its flows into specs/<capability>/diagrams.md."
+    - "For a YES gate, add a `## Placement` table (Stable name | Source of Truth file | Action: update, add, move from <old file>, remove | Why here). Diagrams belong to the capability whose behaviour they show: when the change creates a capability, its new flows go in specs/<capability>/diagrams.md. A row that adds or moves a diagram into specs/architecture/diagrams.md must say in `Why here` which capabilities it spans."
     - "Copy the Before State verbatim from the file each Placement row names (for a move, the old file); copy only the affected stable-named sections."
     - "Keep stable section names unchanged when modifying an existing diagram - the archive merge targets sections by name."
     - "If no visual concern is affected, record NO with a one-line reason and omit Before/After sections."
