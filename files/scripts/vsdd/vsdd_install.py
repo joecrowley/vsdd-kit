@@ -12,7 +12,8 @@ It does SETUP.md Steps 0-5 and creates the decisions log:
   2  copy the schema, docs and scripts
   3  config.yaml: write the kit example (fresh or stock config), or merge the VSDD
      keys into an existing one where that can be done safely
-  4  AGENTS.md section, and CLAUDE.md for Claude Code
+  4  AGENTS.md: the VSDD section, a one-line pointer, or nothing (--agents-md);
+     CLAUDE.md imports AGENTS.md for Claude Code
   5  skill and command overlay, then `--check`
   6  openspec/specs/architecture/decisions.md header (no rules are invented)
 
@@ -21,6 +22,7 @@ BEFORE changing anything (exit 3) and names the flag that records the answer:
   uncommitted changes                 --allow-dirty
   `openspec update` would delete      --update safe  (keep them) | --update plain (accept)
   a custom schema                     --custom-schema switch | --custom-schema keep
+  an existing AGENTS.md               --agents-md full | pointer | skip
   a home-folder tool (e.g. MiniMax)   --extra-dir <folder>
   hand-edited skills                  do SETUP.md Step 1b by hand, then re-run
 
@@ -58,6 +60,7 @@ KIT_FILES = HERE.parent.parent
 SCRIPTS = ("validate_mermaid.py", "install_overlay.py", "merge_diagrams.py",
            "openspec_preflight.py", "vsdd_snapshot.py")
 SECTION = "## OpenSpec & Visual Spec-Driven Development"
+POINTER_MARK = "vsdd:pointer"
 CHECK_CHANGE = "vsdd-install-check"
 # A line from each VSDD entry of config.yaml.example, used to tell whether an
 # existing config already has it: (top-level key, sub-key, marker text)
@@ -152,12 +155,30 @@ class Installer:
             stops.append(f"the project uses a custom schema '{self.schema}'. Options (SETUP.md Step 3): "
                          "--custom-schema switch (use visual-driven), or --custom-schema keep (you add "
                          "the diagrams artifact to their schema by hand), or stop")
+        self.agents_mode = a.agents_md or self.default_agents_mode()
+        if self.agents_mode is None:
+            stops.append("AGENTS.md already exists. Ask the user how VSDD should appear in it: "
+                         "--agents-md full (a routing section: /opsx, diagrams, validator, decisions log), "
+                         "--agents-md pointer (one line pointing at docs/VSDD.md), or --agents-md skip "
+                         "(leave it alone - /opsx still works, but ad-hoc agent work won't know about VSDD)")
         hand = self.hand_edited_skills()
         if hand:
             stops.append("these skills mention diagrams but have no VSDD markers, so they were probably "
                          f"hand-edited: {', '.join(hand)}. Do SETUP.md Step 1b by hand, then re-run")
         if stops:
             raise Stop("\n".join(f"- {s}" for s in stops))
+
+    def default_agents_mode(self) -> str | None:
+        """full for a new AGENTS.md, the existing choice on an upgrade, None = ASK."""
+        agents = self.root / "AGENTS.md"
+        if not agents.exists():
+            return "full"
+        text = agents.read_text(encoding="utf-8")
+        if SECTION in text:
+            return "full"
+        if POINTER_MARK in text:
+            return "pointer"
+        return None
 
     def hand_edited_skills(self) -> list[str]:
         out = []
@@ -336,20 +357,29 @@ class Installer:
         self.done.append("3 config check: rules reach `openspec instructions`")
 
     def step4_agents(self) -> None:
-        root = self.root
-        snippet = (KIT_FILES / "agents" / "AGENTS.vsdd.md").read_text(encoding="utf-8").rstrip("\n") + "\n"
+        root, mode = self.root, self.agents_mode
         agents = root / "AGENTS.md"
-        self.plan.append("4 AGENTS.md VSDD section" + (", CLAUDE.md @AGENTS.md" if "claude" in self.tools else ""))
+        touch_claude = "claude" in self.tools and mode != "skip"
+        self.plan.append(f"4 AGENTS.md: {mode}" + (", CLAUDE.md @AGENTS.md" if touch_claude else ""))
         if self.args.dry_run:
             return
+        if mode == "skip":
+            self.done.append("4 AGENTS.md: left alone (--agents-md skip)")
+            self.todo.append("Step 4: AGENTS.md was left alone by request. /opsx carries VSDD on its own; "
+                             "mention in the report that ad-hoc agent work won't see the VSDD rules")
+            return
+        name = "AGENTS.vsdd.md" if mode == "full" else "AGENTS.vsdd-pointer.md"
+        snippet = (KIT_FILES / "agents" / name).read_text(encoding="utf-8").rstrip("\n") + "\n"
         if agents.exists():
             text = agents.read_text(encoding="utf-8")
+            had = "section" if SECTION in text else "pointer" if POINTER_MARK in text else None
             if SECTION in text:
-                text = replace_section(text, SECTION, snippet)
-                self.done.append("4 AGENTS.md: VSDD section replaced")
-            else:
-                text = text.rstrip("\n") + "\n\n" + snippet
-                self.done.append("4 AGENTS.md: VSDD section appended")
+                text = replace_section(text, SECTION, "")
+            text = "\n".join(l for l in text.splitlines() if POINTER_MARK not in l)
+            text = re.sub(r"\n{3,}", "\n\n", text).rstrip("\n") + "\n\n" + snippet
+            want = "section" if mode == "full" else "pointer"
+            self.done.append(f"4 AGENTS.md: VSDD {want} " + (
+                "added" if had is None else "refreshed" if had == want else f"replaces the {had}"))
             if re.search(r"^##+ .*Diagram Standards", text, re.M | re.I):
                 self.todo.append("Step 4 (ASK): AGENTS.md still has an older diagram-rules section. Ask "
                                  "before removing it - the VSDD section and docs/VSDD.md replace it")
@@ -357,9 +387,9 @@ class Installer:
             text = f"# AGENTS.md\n\n<!-- TODO(vsdd): one-line description of {root.name} -->\n\n{snippet}"
             self.todo.append("Step 4: replace the TODO line at the top of AGENTS.md with a one-line "
                              "project description")
-            self.done.append("4 AGENTS.md: created")
+            self.done.append(f"4 AGENTS.md: created ({mode})")
         agents.write_text(text, encoding="utf-8")
-        if "claude" in self.tools:
+        if touch_claude:
             claude = root / "CLAUDE.md"
             if not claude.exists():
                 shutil.copy2(KIT_FILES / "agents" / "CLAUDE.md.example", claude)
@@ -463,6 +493,8 @@ def main() -> int:
                     help="when `openspec update` would delete workflows: keep them (safe) or accept (plain)")
     ap.add_argument("--custom-schema", choices=("switch", "keep"),
                     help="when the project has a custom schema: switch to visual-driven, or keep it")
+    ap.add_argument("--agents-md", choices=("full", "pointer", "skip"),
+                    help="how VSDD appears in an existing AGENTS.md: routing section, one-line pointer, or not at all")
     ap.add_argument("--dry-run", action="store_true", help="check for decisions and print the plan only")
     ap.add_argument("--json", action="store_true", help="machine-readable result")
     args = ap.parse_args()

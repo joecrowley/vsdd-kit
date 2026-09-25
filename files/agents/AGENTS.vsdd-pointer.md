@@ -1,0 +1,1 @@
+This repo uses Visual Spec-Driven Development (OpenSpec with Mermaid architecture diagrams): make changes with the `/opsx` commands, read `docs/VSDD.md` before editing a diagram or after running `openspec init` or `openspec update`, and read `openspec/specs/architecture/decisions.md` before designing a change. <!-- vsdd:pointer -->

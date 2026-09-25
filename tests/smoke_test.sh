@@ -323,6 +323,19 @@ grep -q "fill in \`context:\`" <<<"$OUT" && grep -q "Step 6: seed" <<<"$OUT" \
 git add -A; git -c user.email=s@t -c user.name=smoke commit -qm install
 HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 && [ -z "$(git status --porcelain)" ] \
   && pass "re-run (upgrade) is idempotent" || fail "re-run changed files: $(git status --porcelain | head -3)"
+HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" --agents-md pointer >/dev/null 2>&1 \
+  && grep -q "vsdd:pointer" AGENTS.md && ! grep -q "^## OpenSpec & Visual" AGENTS.md \
+  && pass "--agents-md pointer replaces the section with one line" || fail "--agents-md pointer"
+git add -A; git -c user.email=s@t -c user.name=smoke commit -qm pointer
+HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 && [ -z "$(git status --porcelain)" ] \
+  && pass "re-run keeps the pointer choice" || fail "re-run changed the pointer choice"
+ROOT6="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-agents.XXXXXX")"
+cd "$ROOT6"; git init -q; printf '# Team rules\n' > AGENTS.md; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base
+rc=0; HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] && [ ! -d openspec ] && pass "existing AGENTS.md: asks first (exit 3)" || fail "existing AGENTS.md: exit $rc"
+HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" --agents-md skip >/dev/null 2>&1 && [ "$(cat AGENTS.md)" = "# Team rules" ] \
+  && pass "--agents-md skip leaves AGENTS.md untouched" || fail "--agents-md skip changed AGENTS.md"
+cd "$ROOT"; rm -rf "$ROOT6"
 cd "$ROOT"
 
 printf '\n\033[32mAll checks passed.\033[0m\n'

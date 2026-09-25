@@ -128,7 +128,7 @@ python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --tools claude --
 | 1 OpenSpec | `openspec init` / `update`, backing up hand-edited skills first |
 | 2 Files | Installs the schema, docs and scripts |
 | 3 Config | `openspec/config.yaml`, with `context` written from your actual project |
-| 4 Agent files | Adds a routing section to `AGENTS.md` (and `CLAUDE.md` for Claude Code) |
+| 4 Agent files | Adds a routing section to `AGENTS.md` (and `CLAUDE.md` for Claude Code). If you already have an `AGENTS.md`, you choose: the section, a one-line pointer, or leave it alone |
 | 5 Overlay | Adds the VSDD steps to the OpenSpec skills and wraps the `/opsx` commands |
 | 6 Baseline | Seeds `openspec/specs/architecture/diagrams.md` from your real code |
 | 7 CI | Optional GitHub Actions workflow |

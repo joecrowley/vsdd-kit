@@ -53,6 +53,7 @@ before changing anything and names the flag that records the user's answer.
      | `openspec update` would delete workflows | `--update safe` or `--update plain` (or the user fixes their profile and you re-run) | Step 1 |
      | Custom schema | `--custom-schema switch` or `--custom-schema keep` | Step 3 |
      | Home-folder tool (MiniMax) | `--extra-dir ~/.minimax` | Step 0 |
+     | `AGENTS.md` already exists | `--agents-md full`, `pointer` or `skip` | Step 4 |
      | Hand-edited skills | none: do Step 1b by hand, then re-run | Step 1b |
 
    - **Exit 2:** a prerequisite is missing (OpenSpec CLI, version, tool ids). It says
@@ -314,26 +315,37 @@ openspec instructions archive --change vsdd-smoke-test --json | grep -c "VSDD"  
 
 ## Step 4 — Agent instruction files
 
-1. **`AGENTS.md`:**
-   - If `ROOT/AGENTS.md` exists and already has a
-     `## OpenSpec & Visual Spec-Driven Development` section: replace that section
-     with `KIT/files/agents/AGENTS.vsdd.md`.
-   - If it exists without one: append the snippet at the end.
-   - If there is no `AGENTS.md`: create one from the snippet, preceded by a one-line
-     project description.
+1. **`AGENTS.md`.** VSDD doesn't need it: `/opsx` carries every VSDD step through the
+   schema, the config and the overlay. The section helps agents doing work **outside**
+   `/opsx` (ad-hoc refactors, hand edits to diagrams, re-running the overlay after
+   `openspec update`).
+   - **No `AGENTS.md`:** create one from `KIT/files/agents/AGENTS.vsdd.md`, preceded
+     by a one-line project description.
+   - **It already has the VSDD section** (`## OpenSpec & Visual Spec-Driven
+     Development`) or the pointer line (marked `<!-- vsdd:pointer -->`): an upgrade.
+     Refresh whichever it has from the kit.
+   - **It exists without either: ASK** the user which they want:
+     - **full**: append the routing section, `KIT/files/agents/AGENTS.vsdd.md`;
+     - **pointer**: append the single line in `KIT/files/agents/AGENTS.vsdd-pointer.md`,
+       which points at `docs/VSDD.md` and the decisions log;
+     - **skip**: leave `AGENTS.md` alone. Say in the report that ad-hoc agent work
+       won't see the VSDD rules.
+
+     To switch later, remove the old form (the section, or the marked line) and add
+     the new one. The installer does this with `--agents-md`.
    - If `AGENTS.md` contains older, longer diagram rules (for example an
      "OpenSpec & Diagram Standards" section): **ASK** before removing them. The
      snippet plus `docs/VSDD.md` replaces them.
-2. **Claude Code** (`claude` in `TOOLS`): Claude Code reads `CLAUDE.md`, not
-   `AGENTS.md`. If there is no `ROOT/CLAUDE.md`, copy
+2. **Claude Code** (`claude` in `TOOLS`, and `AGENTS.md` not skipped): Claude Code
+   reads `CLAUDE.md`, not `AGENTS.md`. If there is no `ROOT/CLAUDE.md`, copy
    `KIT/files/agents/CLAUDE.md.example` to `ROOT/CLAUDE.md`. It contains a single
    line that imports `AGENTS.md`. If `CLAUDE.md` exists, check whether it already
    contains `@AGENTS.md`, and add that line at the top if not.
 3. **Other tools:** Codex, OpenCode, Cursor, Qwen Code and most others read
    `AGENTS.md` directly. Nothing more to do.
 
-**Verify:** `grep -n "docs/VSDD.md" "$ROOT"/AGENTS.md` prints a line. If Claude Code
-is in `TOOLS`, `grep -n "@AGENTS.md" "$ROOT"/CLAUDE.md` prints a line too.
+**Verify** (unless skipped): `grep -n "docs/VSDD.md" "$ROOT"/AGENTS.md` prints a line.
+If Claude Code is in `TOOLS`, `grep -n "@AGENTS.md" "$ROOT"/CLAUDE.md` prints a line too.
 
 ---
 
@@ -480,7 +492,7 @@ Reply with:
 - OpenSpec <version>, tools: <TOOLS>
 - Schema: visual-driven (validated)
 - Config: context + rules (<created | updated - note if `prompts:` was renamed>)
-- Agent files: <AGENTS.md created/updated>, <CLAUDE.md created/updated/n.a.>
+- Agent files: <AGENTS.md created / section / pointer / skipped>, <CLAUDE.md created/updated/n.a.>
 - Overlay: <N> skills patched, <M> commands wrapped (check: OK)
 - Source of Truth: <files and stable section names>
 - Decisions log: <created empty | N entries | already existed>
