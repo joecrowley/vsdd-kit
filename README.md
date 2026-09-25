@@ -227,8 +227,9 @@ version. Rolling back means switching branch, then running
 **Workspaces that share one folder of `/opsx` commands** (VS Code multi-root, Devin)
 are supported: the preflight finds the shared folder, the installer asks before
 patching it, and a guard keeps the VSDD steps inactive in projects without VSDD.
-With `--tooling-dir`, the kit's docs and scripts live in the shared folder too, and the
-project only gets the schema, its config entries and its own diagrams.
+With `--tooling-dir`, the kit's docs and scripts stay outside the project (for example
+in the kit clone, added to the workspace), and the project only gets the schema, its
+config entries and its own diagrams.
 
 **Installing into a project that already uses OpenSpec** is supported. The runbook
 runs the preflight first. It keeps your specs, changes and `config.yaml` entries,

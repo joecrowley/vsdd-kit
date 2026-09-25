@@ -377,6 +377,14 @@ HOME="$IH" python3 "$INST" --root . --tools none --extra-dir ../shared --tooling
 rm -rf docs scripts
 python3 ../shared/vsdd/scripts/vsdd/validate_mermaid.py --root . >/dev/null && python3 ../shared/vsdd/scripts/vsdd/install_overlay.py --root . --extra-dir ../shared --check >/dev/null \
   && pass "--tooling-dir: checks run from the tooling folder with no kit files in the project" || fail "--tooling-dir checks"
+KITNAME="$(basename "$KIT")"
+printf '{ "folders": [ {"path": "app"}, {"path": "shared"}, {"path": "%s"} ] }\n' "$KIT" > "$WS/team.code-workspace"
+KITSTATE="$(git -C "$KIT" status --porcelain -- files)"
+git add -A; git -c user.email=s@t -c user.name=smoke commit -qm tooling
+HOME="$IH" python3 "$INST" --root . --tools none --extra-dir ../shared --tooling-dir "$KIT/files" >/dev/null 2>&1 \
+  && grep -q "python3 $KITNAME/files/scripts/vsdd/merge_diagrams.py --root app" openspec/config.yaml \
+  && ! grep -q "shared/vsdd" openspec/config.yaml && [ "$(git -C "$KIT" status --porcelain -- files)" = "$KITSTATE" ] \
+  && pass "--tooling-dir <kit>/files: used in place, config repointed from the old tooling folder" || fail "--tooling-dir kit in place"
 cd "$ROOT"
 
 printf '\n\033[32mAll checks passed.\033[0m\n'

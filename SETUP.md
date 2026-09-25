@@ -543,8 +543,12 @@ to or above `ROOT` (pass `--workspace <file>` or `--shared-dir <folder>` otherwi
   workspace for OpenSpec work. Otherwise its stock commands bypass VSDD.
 
 **Keep the kit's tooling out of the project, too** (optional). Add
-`--tooling-dir <shared folder>/vsdd`: the kit's docs and scripts go there instead of
-the project. The project keeps only what OpenSpec needs locally (the
+`--tooling-dir <folder>`: the kit's docs and scripts go there instead of the project.
+The simplest choice is **the kit clone itself**: add it to the workspace and pass
+`--tooling-dir "$KIT"/files`. Nothing is copied, `git pull` in the kit upgrades the
+tooling, and removing the kit from the workspace switches VSDD off without touching
+the project. Any other workspace folder works too (e.g. `<shared folder>/vsdd`), and
+re-running with a different folder repoints the config. The project keeps only what OpenSpec needs locally (the
 `visual-driven` schema, which OpenSpec only looks up in the project), its config
 entries, and its own diagrams and decisions log. The config's `context:` names the
 tooling folder, and its VSDD rules use workspace-relative paths with

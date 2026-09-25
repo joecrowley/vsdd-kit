@@ -30,7 +30,9 @@ BEFORE changing anything (exit 3) and names the flag that records the answer:
 
 --tooling-dir <folder> keeps the kit's docs and scripts out of the project: they are
 copied to that folder (e.g. a shared spec-core/vsdd in the editor workspace), and the
-project's config names it. Only the schema (OpenSpec needs it in the project), the
+project's config names it. Pointing it at the kit's own files/ folder (the kit clone
+added to the workspace) uses them in place: nothing is copied, and `git pull` in the
+kit upgrades them. Only the schema (OpenSpec needs it in the project), the
 config entries and the project's own diagrams stay in the project.
 
 What is left for the agent is printed at the end (and in --json): the config
@@ -346,11 +348,17 @@ class Installer:
         if dest.exists():
             shutil.rmtree(dest)
         shutil.copytree(KIT_FILES / "openspec" / "schemas" / "visual-driven", dest)
+        in_place = self.tooling is not None and self.tooling == KIT_FILES.resolve()
         if self.tooling:
             left = [p for p in ("docs/VSDD.md", "docs/MERMAID_RULES.md", "scripts/vsdd") if (root / p).exists()]
             if left:
                 self.todo.append(f"Step 2: the project still has its own copies of {', '.join(left)}. The tooling "
                                  f"now lives in {self.T}: remove them from the project if the kit put them there")
+        if in_place:
+            run(["openspec", "schema", "validate", "visual-driven"], root)
+            self.done.append(f"2 copied the schema into the project; docs and scripts used in place from the kit "
+                             f"({self.T}); schema is valid")
+            return
         (tools / "docs").mkdir(parents=True, exist_ok=True)
         shutil.copy2(KIT_FILES / "docs" / "VSDD.md", tools / "docs" / "VSDD.md")
         rules = tools / "docs" / "MERMAID_RULES.md"
@@ -396,7 +404,13 @@ class Installer:
         if self.args.dry_run:
             return
         if self.tooling:
-            text = self.localise(path.read_text(encoding="utf-8"))
+            text = path.read_text(encoding="utf-8")
+            old = re.search(r"VSDD tooling: its docs and scripts are in `([^`]+)`.*?--root ([^`\s]+)`", text)
+            if old and (old.group(1), old.group(2)) != (self.T, self.P):
+                # The tooling folder moved: repoint every path the previous install wrote.
+                text = text.replace(f"{old.group(1)}/", f"{self.T}/").replace(f"--root {old.group(2)}", f"--root {self.P}")
+                text = re.sub(r"^  VSDD tooling: .*$", self.tooling_context(), text, count=1, flags=re.M)
+            text = self.localise(text)
             if "VSDD tooling:" not in text:
                 block = top_level_block(text, "context")
                 if block:
