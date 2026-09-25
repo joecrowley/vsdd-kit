@@ -9,7 +9,9 @@ This script re-applies the VSDD additions:
   skills   - inserts diagram and decisions-log steps into openspec-{propose,continue-change,
              ff-change,update-change,apply-change,verify-change,
              archive-change,bulk-archive-change} at anchor lines. Idempotent: each insertion
-             carries a `<!-- vsdd:<id> -->` marker and is skipped if present.
+             carries a `<!-- vsdd:<id> -->` marker and is skipped if present. A guard line
+             at the top of each skill makes the VSDD steps no-ops in projects without
+             docs/VSDD.md, so a skill folder shared by several projects can be patched.
   commands - rewrites the matching /opsx command files as thin wrappers that
              load the (patched) skill, so commands and skills cannot diverge.
 
@@ -51,6 +53,10 @@ GEN_DIAGRAMS = """\
   `python3 scripts/vsdd/validate_mermaid.py`: it checks the Placement table and
   that the Before copies are verbatim.
 """
+
+GUARD = """\
+> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. <!-- vsdd:guard -->"""
+FRONTMATTER_END = "<frontmatter-end>"  # anchor: the line after the closing `---` of the YAML front matter
 
 GEN_DECISIONS = """\
 - Before writing design.md (or tasks.md, when the change has no design), read
@@ -207,6 +213,9 @@ PATCHES: dict[str, list[Patch]] = {
     ],
 }
 
+for _patches in PATCHES.values():
+    _patches.insert(0, Patch("guard", (FRONTMATTER_END,), "after", GUARD))
+
 # /opsx command name -> skill it should delegate to
 COMMANDS = {
     "propose": "openspec-propose",
@@ -222,11 +231,11 @@ COMMANDS = {
 WRAPPER_MARK = "<!-- vsdd:wrapper -->"
 
 
-def wrapper_body(skill_rel: str, skill: str) -> str:
+def wrapper_body(location: str, skill: str) -> str:
     return (
         f"{WRAPPER_MARK}\n"
         f"Load the `{skill}` skill and follow it exactly. Its instructions are in\n"
-        f"`{skill_rel}` - read that file now if the skill is not already loaded.\n"
+        f"{location} - read that file now if the skill is not already loaded.\n"
         f"Treat any text given with this command as the skill's input\n"
         f"(for example a change name or a description of the change).\n"
     )
@@ -234,6 +243,24 @@ def wrapper_body(skill_rel: str, skill: str) -> str:
 
 def tool_dirs(root: Path) -> list[Path]:
     return sorted(p for p in root.iterdir() if p.is_dir() and p.name.startswith(".") and p.name not in SKIP_DIRS)
+
+
+def expand_extra(extra: Path) -> list[Path]:
+    """A tool folder (e.g. ~/.minimax) as is; a shared workspace folder as its tool folders."""
+    if extra.name.startswith("."):
+        return [extra]
+    return tool_dirs(extra) or [extra]
+
+
+def skill_location(target: Path, root: Path, owner: Path | None) -> str:
+    """How a wrapper names its skill file: project-relative, ~/..., or <workspace folder>/..."""
+    if target.is_relative_to(root):
+        return f"`{target.relative_to(root)}`"
+    home = Path.home()
+    if target.is_relative_to(home) and owner is not None and owner.parent == home:
+        return f"`~/{target.relative_to(home)}`"
+    base = owner.parent if owner is not None and owner.name.startswith(".") else (owner or target.parent)
+    return f"`{target.relative_to(base.parent)}` (in the `{base.name}` folder of this workspace)"
 
 
 def walk(base: Path, depth: int = 4):
@@ -257,12 +284,24 @@ def apply_patches(text: str, patches: list[Patch]) -> tuple[str, list[str], list
     missing: list[str] = []
     lines = text.split("\n")
     for patch in patches:
-        if f"vsdd:{patch.pid}" in "\n".join(lines):
+        present = [i for i, l in enumerate(lines) if f"<!-- vsdd:{patch.pid} -->" in l]
+        if present:
+            block = patch.text.rstrip("\n")
+            # Single-line blocks carry their marker inline, so they can be refreshed in place.
+            if "\n" not in block and lines[present[0]] != block:
+                lines[present[0]] = block
+                applied.append(f"{patch.pid} (refreshed)")
             continue
         idx = None
         for anchor in patch.anchors:
-            rx = re.compile(anchor)
-            idx = next((i for i, l in enumerate(lines) if rx.search(l)), None)
+            if anchor == FRONTMATTER_END:
+                if lines and lines[0].strip() == "---":
+                    idx = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+                else:
+                    idx = -1 if lines else None  # no front matter: insert at the top
+            else:
+                rx = re.compile(anchor)
+                idx = next((i for i, l in enumerate(lines) if rx.search(l)), None)
             if idx is not None:
                 break
         if idx is None:
@@ -323,11 +362,13 @@ def main() -> int:
     mode.add_argument("--check", action="store_true")
     ap.add_argument("--no-commands", action="store_true", help="patch skills only")
     ap.add_argument("--extra-dir", type=Path, action="append", default=[],
-                    help="also treat this folder as a tool folder (e.g. ~/.minimax for tools that "
-                         "install skills in your home folder). Repeatable. Machine-wide: ask first")
+                    help="also patch this folder: a tool folder outside the project (e.g. ~/.minimax), "
+                         "or a shared workspace folder holding tool folders (.devin/, .github/, ...). "
+                         "Repeatable. Affects every project that uses it: ask first")
     args = ap.parse_args()
     root = args.root.resolve()
-    dirs = tool_dirs(root) + [d.expanduser().resolve() for d in args.extra_dir if d.expanduser().is_dir()]
+    extra = [d.expanduser().resolve() for d in args.extra_dir if d.expanduser().is_dir()]
+    dirs = tool_dirs(root) + [t for d in extra for t in expand_extra(d)]
 
     # Pass 1: patch skills in every tool folder, remembering where each skill lives.
     skills_found = 0
@@ -401,7 +442,8 @@ def main() -> int:
                 elif args.dry_run:
                     print(f"  ~ {rel}: would become wrapper -> {skill}")
                 else:
-                    body = wrapper_body(display(target, root), skill)
+                    owner = next((d for d in dirs if target.is_relative_to(d)), None)
+                    body = wrapper_body(skill_location(target, root, owner), skill)
                     f.write_text(rewrite_command(f, body), encoding="utf-8")
                     print(f"  + {rel}: now wraps {skill}")
 

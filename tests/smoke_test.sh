@@ -321,8 +321,11 @@ CLAUDE_OK=1; [[ "$TOOLS" == *claude* ]] && ! grep -q "@AGENTS.md" CLAUDE.md 2>/d
 grep -q "fill in \`context:\`" <<<"$OUT" && grep -q "Step 6: seed" <<<"$OUT" \
   && pass "installer lists the judgement steps left (context, baseline diagrams)" || fail "installer to-do list"
 git add -A; git -c user.email=s@t -c user.name=smoke commit -qm install
+NSNAP=$(ls "$IH/.vsdd-snapshots" | wc -l)
 HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 && [ -z "$(git status --porcelain)" ] \
   && pass "re-run (upgrade) is idempotent" || fail "re-run changed files: $(git status --porcelain | head -3)"
+[ "$(ls "$IH/.vsdd-snapshots" | wc -l)" = "$NSNAP" ] && pass "re-run on the install branch reuses the pre-install snapshot" \
+  || fail "re-run took a new snapshot of a half-installed state"
 HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" --agents-md pointer >/dev/null 2>&1 \
   && grep -q "vsdd:pointer" AGENTS.md && ! grep -q "^## OpenSpec & Visual" AGENTS.md \
   && pass "--agents-md pointer replaces the section with one line" || fail "--agents-md pointer"
@@ -336,6 +339,44 @@ rc=0; HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 || rc
 HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" --agents-md skip >/dev/null 2>&1 && [ "$(cat AGENTS.md)" = "# Team rules" ] \
   && pass "--agents-md skip leaves AGENTS.md untouched" || fail "--agents-md skip changed AGENTS.md"
 cd "$ROOT"; rm -rf "$ROOT6"
+ROOT7="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-custom.XXXXXX")"
+cd "$ROOT7"; git init -q; openspec init --tools claude . </dev/null >/dev/null 2>&1
+openspec schema fork spec-driven team </dev/null >/dev/null 2>&1 || fail "openspec schema fork"
+sed -i.bak 's/^schema: .*/schema: team/' openspec/config.yaml && rm -f openspec/config.yaml.bak
+git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base
+HOME="$IH" python3 "$INST" --root . --tools claude --custom-schema keep --agents-md skip >/dev/null 2>&1 \
+  && grep -q "^schema: team" openspec/config.yaml \
+  && pass "--custom-schema keep: installs without a diagrams artifact, schema kept" || fail "--custom-schema keep install"
+cd "$ROOT"; rm -rf "$ROOT7"
+cd "$ROOT"
+
+step "Shared workspace folder (VS Code multi-root)"
+WS="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-ws.XXXXXX")"
+[ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT" "$XDG" "$ROOT2" "$XFULL" "$XLESS" "$ROOT3" "$XR" "$(dirname "$SNAP")" "$ROOT4" "$FH" "$ROOT5" "$IH" "$WS"' EXIT
+mkdir -p "$WS/app" "$WS/shared"
+(cd "$WS/shared" && git init -q && openspec init --tools claude . </dev/null >/dev/null 2>&1 && rm -rf openspec)
+printf '{\n  // team workspace\n  "folders": [ { "path": "app" }, { "path": "shared" }, ],\n}\n' > "$WS/team.code-workspace"
+cd "$WS/app"; git init -q; echo "# app" > README.md; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base
+rc=0; OUT="$(python3 "$KIT/files/scripts/vsdd/openspec_preflight.py" 2>&1)" || rc=$?
+[ "$rc" = 1 ] && grep -q "Shared folder: .*STOCK" <<<"$OUT" && pass "preflight finds the stock shared folder via .code-workspace (with comments)" || fail "preflight missed the shared folder"
+rc=0; HOME="$IH" python3 "$INST" --root . --tools claude >/dev/null 2>&1 || rc=$?
+[ "$rc" = 3 ] && [ ! -d openspec ] && pass "installer asks before patching a shared folder (exit 3)" || fail "shared folder: exit $rc"
+HOME="$IH" python3 "$INST" --root . --tools none --extra-dir ../shared >/dev/null 2>&1 && [ ! -d .claude ] \
+  && pass "--tools none --extra-dir: OpenSpec without project command copies" || fail "--tools none install"
+grep -q "vsdd:guard" ../shared/.claude/skills/openspec-archive-change/SKILL.md && grep -q "vsdd:archive-decisions" ../shared/.claude/skills/openspec-archive-change/SKILL.md \
+  && pass "shared skills patched, with the guard" || fail "shared skills not patched"
+grep -q 'shared/.claude/skills/openspec-propose/SKILL.md` (in the `shared` folder of this workspace)' ../shared/.claude/commands/opsx/propose.md \
+  && pass "shared wrappers name the skill by workspace folder, not an absolute path" || fail "shared wrapper path"
+python3 "$KIT/files/scripts/vsdd/openspec_preflight.py" 2>&1 | grep -q "Shared folder: .*VSDD-patched" \
+  && pass "preflight reports the shared folder as patched" || fail "preflight after patch"
+git add -A; git -c user.email=s@t -c user.name=smoke commit -qm vsdd
+HOME="$IH" python3 "$INST" --root . --tools none --extra-dir ../shared --tooling-dir ../shared/vsdd >/dev/null 2>&1 \
+  && [ -f ../shared/vsdd/scripts/vsdd/validate_mermaid.py ] && [ -f ../shared/vsdd/docs/VSDD.md ] \
+  && grep -q "VSDD tooling: .*shared/vsdd" openspec/config.yaml && grep -q "python3 shared/vsdd/scripts/vsdd/merge_diagrams.py --root app" openspec/config.yaml \
+  && pass "--tooling-dir: docs and scripts in the shared folder, config paths workspace-relative" || fail "--tooling-dir"
+rm -rf docs scripts
+python3 ../shared/vsdd/scripts/vsdd/validate_mermaid.py --root . >/dev/null && python3 ../shared/vsdd/scripts/vsdd/install_overlay.py --root . --extra-dir ../shared --check >/dev/null \
+  && pass "--tooling-dir: checks run from the tooling folder with no kit files in the project" || fail "--tooling-dir checks"
 cd "$ROOT"
 
 printf '\n\033[32mAll checks passed.\033[0m\n'

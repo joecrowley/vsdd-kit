@@ -11,6 +11,9 @@ Reports, for the project at --root:
   - requested tools (--tools) that are not set up yet: add them with
     `openspec init --tools <tool>`, which leaves other tools and config.yaml alone
   - in-flight changes and their schema (changes made before VSDD keep their schema)
+  - shared workspace folders (VS Code `.code-workspace` next to or above the project,
+    or --workspace / --shared-dir) that hold OpenSpec skills or /opsx commands: whether
+    they are VSDD-patched, and whether they duplicate the project's own commands
 
 --safe-update runs `openspec update` with a temporary global config listing every
 workflow that is either installed or in your profile, so nothing is deleted. Your
@@ -57,6 +60,12 @@ TOOL_DIRS: dict[str, tuple[str, ...]] = {
     "zcode": (".zcode",), "agents": (".agents",),
 }
 HOME_TOOLS: dict[str, str] = {"minimax-code": "~/.minimax"}
+# Skills and commands VSDD patches (the rest, e.g. explore and sync, stay stock).
+VSDD_SKILLS = {"openspec-propose", "openspec-continue-change", "openspec-ff-change", "openspec-update-change",
+               "openspec-apply-change", "openspec-verify-change", "openspec-archive-change",
+               "openspec-bulk-archive-change"}
+VSDD_COMMANDS = {"propose", "continue", "ff", "update", "apply", "verify", "archive", "bulk-archive"}
+COMMAND_RE = re.compile(r"(^|/)(opsx-[\w-]+\.(md|prompt\.md|prompt|toml)|opsx/[\w-]+\.(md|toml))$")
 
 
 def workflow_id(skill_dir: str) -> str:
@@ -76,6 +85,60 @@ def installed_skills(root: Path) -> dict[str, set[str]]:
                 continue
             found.setdefault(tool.name, set()).add(workflow_id(skill.parent.name))
     return found
+
+
+def _load_jsonc(text: str) -> dict:
+    """Parse a .code-workspace file (JSON with comments and trailing commas)."""
+    text = re.sub(r'("(?:\\.|[^"\\])*")|//[^\n]*|/\*.*?\*/', lambda m: m.group(1) or "", text, flags=re.S)
+    text = re.sub(r",(\s*[}\]])", r"\1", text)
+    return json.loads(text)
+
+
+def workspace_folders(root: Path, workspace_files: list[Path], include_root: bool = False) -> dict[Path, str]:
+    """{folder: workspace file} for workspaces that include root (root itself only if asked)."""
+    candidates = list(workspace_files) or [*root.glob("*.code-workspace"), *root.parent.glob("*.code-workspace")]
+    out: dict[Path, str] = {}
+    for ws in candidates:
+        try:
+            folders = [(ws.parent / f["path"]).expanduser().resolve()
+                       for f in _load_jsonc(ws.read_text(encoding="utf-8")).get("folders", []) if "path" in f]
+        except (OSError, ValueError, TypeError, AttributeError):
+            continue
+        if root in folders or workspace_files:
+            for f in folders:
+                if (f != root or include_root) and f.is_dir():
+                    out.setdefault(f, str(ws))
+    return out
+
+
+def openspec_content(folder: Path) -> dict:
+    """Skills and /opsx commands in a folder's tool folders, and whether VSDD patched them."""
+    skills, commands, patched, guarded, wrapped, vsdd_skills, vsdd_commands = [], [], 0, 0, 0, 0, 0
+    tops = [folder] if folder.name.startswith(".") else [p for p in folder.iterdir()
+                                                           if p.is_dir() and p.name.startswith(".") and p.name not in SKIP_DIRS]
+    for top in tops:
+        for f in top.rglob("*"):
+            if not f.is_file() or any(part in SKIP_DIRS for part in f.parts):
+                continue
+            rel = f.relative_to(folder).as_posix()
+            if f.name == "SKILL.md" and f.parent.name.startswith("openspec-"):
+                skills.append(rel)
+                if f.parent.name not in VSDD_SKILLS:
+                    continue
+                vsdd_skills += 1
+                text = f.read_text(encoding="utf-8", errors="replace")
+                patched += "vsdd:" in text
+                guarded += "vsdd:guard" in text
+            elif COMMAND_RE.search(rel):
+                commands.append(rel)
+                name = re.sub(r"\.(prompt\.md|md|prompt|toml)$", "", f.name).removeprefix("opsx-")
+                if name in VSDD_COMMANDS:
+                    vsdd_commands += 1
+                    wrapped += "vsdd:wrapper" in f.read_text(encoding="utf-8", errors="replace")
+    return {"skills": len(skills), "commands": len(commands), "patched_skills": patched,
+            "guarded_skills": guarded, "wrapped_commands": wrapped,
+            "vsdd_skills": vsdd_skills, "vsdd_commands": vsdd_commands,
+            "tool_folders": sorted({r.split("/")[0] for r in skills + commands})}
 
 
 def run(cmd: list[str], cwd: Path, env: dict | None = None) -> subprocess.CompletedProcess:
@@ -158,6 +221,10 @@ def main() -> int:
     ap.add_argument("--root", type=Path, default=Path.cwd())
     ap.add_argument("--tools", default="", help="comma-separated OpenSpec tool ids you want set up")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
+    ap.add_argument("--workspace", type=Path, action="append", default=[],
+                    help="a .code-workspace file to inspect (default: any next to or above the project)")
+    ap.add_argument("--shared-dir", type=Path, action="append", default=[],
+                    help="a shared folder the workspace adds (e.g. for Devin), to inspect")
     ap.add_argument("--safe-update", action="store_true",
                     help="run `openspec update` without deleting installed workflows")
     args = ap.parse_args()
@@ -189,6 +256,21 @@ def main() -> int:
     schema = configured_schema(root)
     custom_schema = schema is not None and schema not in STOCK_SCHEMAS
     changes = in_flight_changes(root)
+    shared = workspace_folders(root, [w.expanduser().resolve() for w in args.workspace])
+    for d in args.shared_dir:
+        shared.setdefault(d.expanduser().resolve(), "--shared-dir")
+    project_has_commands = openspec_content(root)["commands"] > 0 if root.is_dir() else False
+    shared_report = []
+    for folder, source in sorted(shared.items()):
+        if not folder.is_dir():
+            continue
+        c = openspec_content(folder)
+        if not (c["skills"] or c["commands"]):
+            continue
+        stock = c["patched_skills"] < c["vsdd_skills"] or c["wrapped_commands"] < c["vsdd_commands"]
+        shared_report.append({"folder": str(folder), "source": source, **c,
+                              "stock": bool(stock), "unguarded": c["patched_skills"] > c["guarded_skills"],
+                              "duplicates_project": bool(c["commands"] and project_has_commands)})
 
     if args.safe_update:
         if not initialised:
@@ -209,6 +291,7 @@ def main() -> int:
         "unknown_tools": unknown_tools,
         "home_folder_tools": {t: HOME_TOOLS[t] for t in home_tools},
         "in_flight_changes": [{"name": n, "schema": s} for n, s in changes],
+        "shared_folders": shared_report,
     }
     if args.json:
         print(json.dumps(report, indent=2))
@@ -235,7 +318,19 @@ def main() -> int:
         for name, s in changes:
             note = "" if s == "visual-driven" else "  (keeps its schema: no diagrams.md, no diagram merge)"
             print(f"In-flight change:    {name} [{s}]{note}")
-    return 1 if (would_remove or custom_schema) else 0
+        for s in shared_report:
+            state = "STOCK (not VSDD-patched)" if s["stock"] else "VSDD-patched" + (
+                ", no guard - re-run the overlay on it" if s["unguarded"] else "")
+            print(f"Shared folder:       {s['folder']}  ({s['skills']} skills, {s['commands']} commands "
+                  f"in {', '.join(s['tool_folders'])}; {state}; from {s['source']})")
+            if s["stock"]:
+                print("   !! Its stock /opsx commands can bypass VSDD. Patching it (--extra-dir) affects every")
+                print("      project that uses it: ASK. The VSDD steps are no-ops where docs/VSDD.md is missing.")
+            if s["duplicates_project"]:
+                print("   !! The project has its own /opsx commands too, so agents see two copies. Prefer one:")
+                print("      `--tools none` to rely on the shared folder, or remove it from the workspace.")
+    blocking = any(s["stock"] for s in shared_report)
+    return 1 if (would_remove or custom_schema or blocking) else 0
 
 
 if __name__ == "__main__":

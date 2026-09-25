@@ -224,6 +224,12 @@ tool folders, untracked `/opsx` commands, your global OpenSpec config and the CL
 version. Rolling back means switching branch, then running
 `vsdd_snapshot.py restore`. See "Roll back an install" in `SETUP.md`.
 
+**Workspaces that share one folder of `/opsx` commands** (VS Code multi-root, Devin)
+are supported: the preflight finds the shared folder, the installer asks before
+patching it, and a guard keeps the VSDD steps inactive in projects without VSDD.
+With `--tooling-dir`, the kit's docs and scripts live in the shared folder too, and the
+project only gets the schema, its config entries and its own diagrams.
+
 **Installing into a project that already uses OpenSpec** is supported. The runbook
 runs the preflight first. It keeps your specs, changes and `config.yaml` entries,
 asks before replacing a custom schema, never deletes workflows without asking, and

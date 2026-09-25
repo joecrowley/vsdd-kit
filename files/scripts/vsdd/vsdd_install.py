@@ -23,8 +23,15 @@ BEFORE changing anything (exit 3) and names the flag that records the answer:
   `openspec update` would delete      --update safe  (keep them) | --update plain (accept)
   a custom schema                     --custom-schema switch | --custom-schema keep
   an existing AGENTS.md               --agents-md full | pointer | skip
+  a shared workspace folder with      --extra-dir <folder> (patch it: affects every project
+  OpenSpec commands (VS Code/Devin)     that uses it) | --leave-shared
   a home-folder tool (e.g. MiniMax)   --extra-dir <folder>
   hand-edited skills                  do SETUP.md Step 1b by hand, then re-run
+
+--tooling-dir <folder> keeps the kit's docs and scripts out of the project: they are
+copied to that folder (e.g. a shared spec-core/vsdd in the editor workspace), and the
+project's config names it. Only the schema (OpenSpec needs it in the project), the
+config entries and the project's own diagrams stay in the project.
 
 What is left for the agent is printed at the end (and in --json): the config
 `context:`, the baseline diagrams (Step 6), CI (Step 7), the smoke test (Step 8)
@@ -51,8 +58,10 @@ from openspec_preflight import (  # noqa: E402
     TOOL_DIRS,
     configured_schema,
     installed_skills,
+    openspec_content,
     profile_workflows,
     safe_update,
+    workspace_folders,
 )
 from install_overlay import PATCHES  # noqa: E402
 
@@ -100,6 +109,7 @@ class Installer:
         self.root: Path = args.root.resolve()
         self.tools = [t.strip() for t in args.tools.split(",") if t.strip()]
         self.extra_dirs = [d.expanduser().resolve() for d in args.extra_dir]
+        self.tooling = args.tooling_dir.expanduser().resolve() if args.tooling_dir else None
         self.done: list[str] = []
         self.todo: list[str] = []
         self.plan: list[str] = []
@@ -117,6 +127,8 @@ class Installer:
         self.version = run(["openspec", "--version"], self.root).stdout.strip()
         if version_tuple(self.version) < (1, 2, 0):
             raise SystemExit(f"error: OpenSpec {self.version} is older than 1.2.0 - ASK the user to upgrade")
+        if self.tools == ["none"]:
+            return
         unknown = [t for t in self.tools if t not in TOOL_DIRS and t not in HOME_TOOLS]
         if not self.tools or unknown:
             raise SystemExit(f"error: --tools needs OpenSpec tool ids; unknown: {', '.join(unknown) or '(none given)'}")
@@ -155,6 +167,38 @@ class Installer:
             stops.append(f"the project uses a custom schema '{self.schema}'. Options (SETUP.md Step 3): "
                          "--custom-schema switch (use visual-driven), or --custom-schema keep (you add "
                          "the diagrams artifact to their schema by hand), or stop")
+        self.shared_notes = []
+        shared = workspace_folders(root, [w.expanduser().resolve() for w in a.workspace])
+        self.ws_folders = sorted(workspace_folders(root, [w.expanduser().resolve() for w in a.workspace],
+                                                   include_root=True),
+                                 key=lambda f: len(f.parts), reverse=True)
+        if self.tooling is not None:
+            self.T, self.P = self.ws_ref(self.tooling), self.ws_ref(root)
+            if not self.ws_folders:
+                self.shared_notes.append(
+                    "Step 3: no editor workspace was found, so the config names the tooling folder by absolute "
+                    "path, which only works on this machine. Pass --workspace <file> and re-run to use "
+                    "workspace-relative paths")
+        for folder, source in sorted(shared.items()):
+            c = openspec_content(folder)
+            if not (c["skills"] or c["commands"]):
+                continue
+            covered = any(folder == d or d.is_relative_to(folder) for d in self.extra_dirs)
+            if covered:
+                if c["commands"] and self.tools != ["none"]:
+                    self.shared_notes.append(
+                        f"Step 9 report: the project and the shared folder {folder} both have /opsx commands, "
+                        "so agents see two copies (both patched). Suggest `--tools none` next time if the "
+                        "shared folder is the one the team uses")
+                continue
+            if not a.leave_shared:
+                stops.append(
+                    f"the workspace ({source}) includes {folder}, which has OpenSpec skills or /opsx commands "
+                    f"({c['skills']} skills, {c['commands']} commands; VSDD-patched skills: {c['patched_skills']}). "
+                    "Stock copies there can bypass VSDD. Ask the user: patch it with --extra-dir "
+                    f"{folder} (affects every project that uses it; the VSDD steps are no-ops in projects "
+                    "without docs/VSDD.md), and use --tools none if the project should rely on that folder "
+                    "instead of its own copies; or leave it with --leave-shared")
         self.agents_mode = a.agents_md or self.default_agents_mode()
         if self.agents_mode is None:
             stops.append("AGENTS.md already exists. Ask the user how VSDD should appear in it: "
@@ -167,6 +211,28 @@ class Installer:
                          f"hand-edited: {', '.join(hand)}. Do SETUP.md Step 1b by hand, then re-run")
         if stops:
             raise Stop("\n".join(f"- {s}" for s in stops))
+
+    def ws_ref(self, path: Path) -> str:
+        """Name a path by its editor-workspace folder (e.g. spec-core/vsdd), else absolutely."""
+        for folder in self.ws_folders:
+            if path == folder or path.is_relative_to(folder):
+                rel = path.relative_to(folder).as_posix()
+                return folder.name if rel == "." else f"{folder.name}/{rel}"
+        return str(path)
+
+    def localise(self, text: str) -> str:
+        """Point kit paths (docs/, scripts/vsdd/) at the tooling folder, and give scripts --root."""
+        if self.tooling is None:
+            return text
+        text = re.sub(r"(?<![\w/.-])python3 scripts/vsdd/([\w]+\.py)",
+                      lambda m: f"python3 {self.T}/scripts/vsdd/{m.group(1)} --root {self.P}", text)
+        text = re.sub(r"(?<![\w/.-])scripts/vsdd/", f"{self.T}/scripts/vsdd/", text)
+        return re.sub(r"(?<![\w/.-])docs/(VSDD|MERMAID_RULES)\.md", rf"{self.T}/docs/\1.md", text)
+
+    def tooling_context(self) -> str:
+        return (f"  VSDD tooling: its docs and scripts are in `{self.T}` (a folder of this workspace), not in this "
+                f"project. Read `{self.T}/docs/VSDD.md`; run scripts as `python3 {self.T}/scripts/vsdd/<script>.py "
+                f"--root {self.P}`.")
 
     def default_agents_mode(self) -> str | None:
         """full for a new AGENTS.md, the existing choice on an upgrade, None = ASK."""
@@ -205,6 +271,11 @@ class Installer:
                 if not self.args.dry_run:
                     run(["git", "switch", "-c", name], self.root)
                     self.done.append(f"0 branch: created {name} from {current or 'HEAD'}")
+        reuse = self.install_snapshot()
+        if reuse:
+            self.snapshot = str(reuse)
+            self.done.append(f"0 snapshot: reusing {reuse} (taken when the install branch was created)")
+            return
         cmd = [sys.executable, str(HERE / "vsdd_snapshot.py"), "--root", str(self.root), "save"]
         for d in self.extra_dirs:
             cmd += ["--extra-dir", str(d)]
@@ -215,6 +286,26 @@ class Installer:
                                   if "snapshot" in l.lower() and ":" in l), out.splitlines()[-1] if out else "")
             self.done.append(f"0 snapshot: {self.snapshot}")
 
+    def install_snapshot(self) -> Path | None:
+        """On a re-run on the install branch: the snapshot taken when that branch was created.
+
+        A new snapshot would capture a half-installed state, and rolling back to it would
+        keep the install. The earliest snapshot taken on this branch is the pre-install one.
+        """
+        if not self.is_git:
+            return None
+        current = run(["git", "branch", "--show-current"], self.root).stdout.strip()
+        if not current.startswith("vsdd-install"):
+            return None
+        for snap in sorted((Path.home() / ".vsdd-snapshots").glob(f"{self.root.name}-*")):
+            try:
+                m = json.loads((snap / "manifest.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if m.get("root") == str(self.root) and (m.get("git") or {}).get("branch") == current:
+                return snap
+        return None
+
     def step1_openspec(self) -> None:
         root, tools = self.root, self.tools
         project_tools = [t for t in tools if t not in HOME_TOOLS] or tools
@@ -224,7 +315,8 @@ class Installer:
                 run(["openspec", "init", "--tools", ",".join(tools), str(root)], root)
                 self.done.append(f"1 openspec init --tools {','.join(tools)}")
             return
-        missing = [t for t in project_tools if not any(f in self.installed for f in TOOL_DIRS.get(t, ()))]
+        missing = [t for t in project_tools if t != "none"
+                   and not any(f in self.installed for f in TOOL_DIRS.get(t, ()))]
         if missing:
             self.plan.append(f"1 add tools: openspec init --tools {','.join(missing)}")
             if not self.args.dry_run:
@@ -245,16 +337,23 @@ class Installer:
 
     def step2_copy(self) -> None:
         root = self.root
-        self.plan.append("2 copy schema, docs/VSDD.md, docs/MERMAID_RULES.md (if missing), scripts/vsdd/")
+        tools = self.tooling or root
+        where = f" into {tools}" if self.tooling else ""
+        self.plan.append(f"2 copy schema; docs/VSDD.md, docs/MERMAID_RULES.md (if missing), scripts/vsdd/{where}")
         if self.args.dry_run:
             return
         dest = root / "openspec" / "schemas" / "visual-driven"
         if dest.exists():
             shutil.rmtree(dest)
         shutil.copytree(KIT_FILES / "openspec" / "schemas" / "visual-driven", dest)
-        (root / "docs").mkdir(exist_ok=True)
-        shutil.copy2(KIT_FILES / "docs" / "VSDD.md", root / "docs" / "VSDD.md")
-        rules = root / "docs" / "MERMAID_RULES.md"
+        if self.tooling:
+            left = [p for p in ("docs/VSDD.md", "docs/MERMAID_RULES.md", "scripts/vsdd") if (root / p).exists()]
+            if left:
+                self.todo.append(f"Step 2: the project still has its own copies of {', '.join(left)}. The tooling "
+                                 f"now lives in {self.T}: remove them from the project if the kit put them there")
+        (tools / "docs").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(KIT_FILES / "docs" / "VSDD.md", tools / "docs" / "VSDD.md")
+        rules = tools / "docs" / "MERMAID_RULES.md"
         if rules.exists():
             if rules.read_bytes() != (KIT_FILES / "docs" / "MERMAID_RULES.md").read_bytes():
                 self.todo.append("Step 2: docs/MERMAID_RULES.md already existed and differs from the kit. "
@@ -262,11 +361,12 @@ class Installer:
                                  "keeping the project's own rules")
         else:
             shutil.copy2(KIT_FILES / "docs" / "MERMAID_RULES.md", rules)
-        (root / "scripts" / "vsdd").mkdir(parents=True, exist_ok=True)
+        (tools / "scripts" / "vsdd").mkdir(parents=True, exist_ok=True)
         for name in SCRIPTS:
-            shutil.copy2(HERE / name, root / "scripts" / "vsdd" / name)
+            shutil.copy2(HERE / name, tools / "scripts" / "vsdd" / name)
         run(["openspec", "schema", "validate", "visual-driven"], root)
-        self.done.append("2 copied kit files; schema visual-driven is valid")
+        self.done.append("2 copied the schema into the project" + (
+            f", docs and scripts into {self.T}" if self.tooling else ", docs and scripts") + "; schema is valid")
 
     def step3_config(self) -> None:
         path = self.root / "openspec" / "config.yaml"
@@ -278,15 +378,33 @@ class Installer:
                      and not l.startswith("schema:")]
         if stock:
             self.plan.append(f"3 write {path.name} from the kit example")
+            keep = self.custom_schema and self.args.custom_schema == "keep"
+            if keep:
+                self.plan.append(f"3 keep schema: {self.schema}")
             if not self.args.dry_run:
-                path.write_text(example, encoding="utf-8")
-                self.done.append(f"3 {path.name}: written from the kit example")
+                text = re.sub(r"^schema:.*$", f"schema: {self.schema}", example, count=1, flags=re.M) if keep else example
+                path.write_text(text, encoding="utf-8")
+                self.done.append(f"3 {path.name}: written from the kit example"
+                                 + (f", keeping schema: {self.schema}" if keep else ""))
+                if keep:
+                    self.todo.append(f"Step 3 (b): add the diagrams artifact to the custom schema "
+                                     f"'{self.schema}' by hand, then `openspec schema validate` it")
         else:
             self.plan.append(f"3 merge VSDD keys into the existing {path.name}")
             if not self.args.dry_run:
                 self.merge_config(path, text, example)
         if self.args.dry_run:
             return
+        if self.tooling:
+            text = self.localise(path.read_text(encoding="utf-8"))
+            if "VSDD tooling:" not in text:
+                block = top_level_block(text, "context")
+                if block:
+                    text = text.replace(block, block.rstrip("\n") + "\n" + self.tooling_context(), 1)
+                else:
+                    text = text.rstrip("\n") + "\n\ncontext: |\n" + self.tooling_context() + "\n"
+            path.write_text(text, encoding="utf-8")
+            self.done.append(f"3 config: VSDD paths point at {self.T}; context names the tooling folder")
         final = path.read_text(encoding="utf-8")
         if "<PROJECT_NAME>" in final or not re.search(r"^context:", final, re.M):
             self.todo.append("Step 3: fill in `context:` in openspec/config.yaml from the README, the package "
@@ -337,6 +455,13 @@ class Installer:
 
     def verify_config(self) -> None:
         root = self.root
+        if self.custom_schema and self.args.custom_schema == "keep":
+            # Their schema has no diagrams artifact until the Step 3 (b) edit is done.
+            self.todo.append("Step 3 (b), after the schema edit: check with `openspec new change x && "
+                             "openspec instructions diagrams --change x` (must show <rules> and "
+                             "MERMAID_RULES), then delete the change")
+            self.done.append("3 config check: deferred until the custom schema has a diagrams artifact")
+            return
         change_dir = root / "openspec" / "changes" / CHECK_CHANGE
         if change_dir.exists():
             raise Failed(f"{change_dir} already exists - remove it and re-run")
@@ -344,9 +469,7 @@ class Installer:
             run(["openspec", "new", "change", CHECK_CHANGE], root)
             out = run(["openspec", "instructions", "diagrams", "--change", CHECK_CHANGE], root).stdout
             missing = [p for p in ("<rules>", "MERMAID_RULES") if p not in out]
-            deferred = getattr(self, "config_incomplete", False) or (
-                self.custom_schema and self.args.custom_schema == "keep")
-            if missing and deferred:
+            if missing and getattr(self, "config_incomplete", False):
                 self.done.append("3 config check: deferred until the to-do entries below are merged")
                 return
             if missing:
@@ -369,7 +492,7 @@ class Installer:
                              "mention in the report that ad-hoc agent work won't see the VSDD rules")
             return
         name = "AGENTS.vsdd.md" if mode == "full" else "AGENTS.vsdd-pointer.md"
-        snippet = (KIT_FILES / "agents" / name).read_text(encoding="utf-8").rstrip("\n") + "\n"
+        snippet = self.localise((KIT_FILES / "agents" / name).read_text(encoding="utf-8")).rstrip("\n") + "\n"
         if agents.exists():
             text = agents.read_text(encoding="utf-8")
             had = "section" if SECTION in text else "pointer" if POINTER_MARK in text else None
@@ -402,7 +525,8 @@ class Installer:
         self.plan.append("5 skill and command overlay, then --check")
         if self.args.dry_run:
             return
-        cmd = [sys.executable, str(self.root / "scripts" / "vsdd" / "install_overlay.py")]
+        cmd = [sys.executable, str((self.tooling or self.root) / "scripts" / "vsdd" / "install_overlay.py"),
+               "--root", str(self.root)]
         for d in self.extra_dirs:
             cmd += ["--extra-dir", str(d)]
         apply = run(cmd, self.root, check=False)
@@ -437,6 +561,7 @@ class Installer:
                      self.step3_config, self.step4_agents, self.step5_overlay, self.step6_decisions):
             step()
         if not self.args.dry_run:
+            self.todo += self.shared_notes
             self.todo += [
                 "Step 6: seed openspec/specs/architecture/diagrams.md from the real code (and ASK about "
                 "capability-level diagrams)" if not (self.root / "openspec" / "specs" / "architecture"
@@ -484,7 +609,9 @@ def replace_section(text: str, heading: str, snippet: str) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", type=Path, required=True, help="the project to install into")
-    ap.add_argument("--tools", required=True, help="comma-separated OpenSpec tool ids, e.g. claude,qwen")
+    ap.add_argument("--tools", required=True,
+                    help="comma-separated OpenSpec tool ids, e.g. claude,qwen; `none` when the commands "
+                         "come from a shared workspace folder (--extra-dir)")
     ap.add_argument("--extra-dir", type=Path, action="append", default=[],
                     help="a home-folder tool's folder the user approved (e.g. ~/.minimax). Repeatable")
     ap.add_argument("--allow-dirty", action="store_true", help="continue with uncommitted changes")
@@ -493,6 +620,13 @@ def main() -> int:
                     help="when `openspec update` would delete workflows: keep them (safe) or accept (plain)")
     ap.add_argument("--custom-schema", choices=("switch", "keep"),
                     help="when the project has a custom schema: switch to visual-driven, or keep it")
+    ap.add_argument("--workspace", type=Path, action="append", default=[],
+                    help="a .code-workspace file to check for shared folders (default: next to or above --root)")
+    ap.add_argument("--tooling-dir", type=Path,
+                    help="put the kit's docs and scripts in this folder (e.g. a shared workspace folder) "
+                         "instead of the project")
+    ap.add_argument("--leave-shared", action="store_true",
+                    help="don't patch shared workspace folders that hold OpenSpec commands")
     ap.add_argument("--agents-md", choices=("full", "pointer", "skip"),
                     help="how VSDD appears in an existing AGENTS.md: routing section, one-line pointer, or not at all")
     ap.add_argument("--dry-run", action="store_true", help="check for decisions and print the plan only")

@@ -54,6 +54,8 @@ before changing anything and names the flag that records the user's answer.
      | Custom schema | `--custom-schema switch` or `--custom-schema keep` | Step 3 |
      | Home-folder tool (MiniMax) | `--extra-dir ~/.minimax` | Step 0 |
      | `AGENTS.md` already exists | `--agents-md full`, `pointer` or `skip` | Step 4 |
+     | A shared workspace folder has OpenSpec commands | `--extra-dir <folder>` (usually with `--tools none`), or `--leave-shared` | "Workspaces with a shared command folder" |
+     | (Optional) keep the kit's docs and scripts out of the project | `--tooling-dir <folder>` | "Workspaces with a shared command folder" |
      | Hand-edited skills | none: do Step 1b by hand, then re-run | Step 1b |
 
    - **Exit 2:** a prerequisite is missing (OpenSpec CLI, version, tool ids). It says
@@ -119,6 +121,8 @@ exact for the installed CLI version:
 | `In-flight change: …` | Changes created before VSDD. They keep their schema | Step 9 report |
 | `Home-folder tool: <tool> installs skills in ~/…` | That tool keeps its OpenSpec skills in the user's home folder (MiniMax: `~/.minimax`). Patching it affects every project on the machine | **ASK** before touching it. If yes, pass `--extra-dir <folder>` to the snapshot (below) and to the overlay (Step 5) |
 | `(not an OpenSpec tool folder …)` | A folder with copies of OpenSpec skills that OpenSpec doesn't manage | Step 5 patches it too. Mention it in the report |
+| `Shared folder: … STOCK` | A folder the editor workspace adds (VS Code `.code-workspace`, Devin) holds `/opsx` commands and skills that aren't patched. Agents can pick those and bypass VSDD | **ASK**, then see "Workspaces with a shared command folder" below |
+| `!! The project has its own /opsx commands too` | Agents see two copies of each command | Prefer one copy. See "Workspaces with a shared command folder" |
 
 **Detect an earlier VSDD install:**
 
@@ -511,6 +515,55 @@ Next: try `/opsx:propose <small change with a visual impact>` and review its dia
 Then suggest the user commit everything on the install branch as a single commit,
 for example `chore: install visual spec-driven development (VSDD)`, review it, and
 merge the branch when they're happy. Do not commit or merge unless asked.
+
+---
+
+## Workspaces with a shared command folder
+
+Some teams keep the `/opsx` commands and `openspec-*` skills in one folder that every
+project's editor workspace adds (a VS Code multi-root `.code-workspace`, or a Devin
+workspace), rather than in each project. The preflight finds VS Code workspaces next
+to or above `ROOT` (pass `--workspace <file>` or `--shared-dir <folder>` otherwise).
+
+**ASK** the user, explaining that the folder is shared:
+
+- **(Recommended) Patch the shared folder, and rely on it:**
+
+  ```bash
+  python3 "$KIT"/files/scripts/vsdd/vsdd_install.py --root "$ROOT" --tools none --extra-dir <shared folder>
+  ```
+
+  `--tools none` initialises OpenSpec without project copies of the commands, so the
+  agent sees one set. The overlay patches the shared skills and wraps its commands.
+  Wrappers name their skill as `<folder>/<path>` "in the `<folder>` folder of this
+  workspace", which works on every machine.
+- **Patch it, and keep project copies too** (`--tools <tools> --extra-dir <folder>`):
+  both copies carry VSDD, but agents see each command twice.
+- **Leave it alone** (`--leave-shared`): only if the project doesn't open that
+  workspace for OpenSpec work. Otherwise its stock commands bypass VSDD.
+
+**Keep the kit's tooling out of the project, too** (optional). Add
+`--tooling-dir <shared folder>/vsdd`: the kit's docs and scripts go there instead of
+the project. The project keeps only what OpenSpec needs locally (the
+`visual-driven` schema, which OpenSpec only looks up in the project), its config
+entries, and its own diagrams and decisions log. The config's `context:` names the
+tooling folder, and its VSDD rules use workspace-relative paths with
+`--root <project>` for the scripts. Consequences, usually wanted when the aim is not
+to impose on an existing project: the project's CI doesn't run the VSDD checks, a
+developer without the workspace just doesn't see VSDD, and upgrading the shared
+tooling upgrades every project that uses it.
+
+**Projects without VSDD that share the folder keep working.** Each patched skill
+starts with a guard: the VSDD steps apply only when the OpenSpec project being worked
+in uses VSDD (its config uses the `visual-driven` schema or has VSDD rules, or it has
+`docs/VSDD.md`), so elsewhere the agent follows the stock steps. The guard also
+explains the tooling-folder path mapping.
+
+**Upkeep:** `openspec update` in a project doesn't refresh the shared folder. When the
+team regenerates it (for example `openspec init --tools <tools>` inside it), run
+`python3 scripts/vsdd/install_overlay.py --extra-dir <shared folder>` afterwards. CI's
+`--check` only sees the shared folder if CI checks it out and passes the same flag.
+Pass the folder to `vsdd_snapshot.py save --extra-dir` too, so a rollback covers it.
 
 ---
 
