@@ -1,6 +1,12 @@
 # Copy to .github/workflows/vsdd.yml
 # Validates Mermaid diagrams in OpenSpec files and checks that the VSDD skill
 # overlay has not been wiped by `openspec update`.
+#
+# Works with both kinds of install:
+#   - the kit's scripts copied into the project (scripts/vsdd/): they are used as is;
+#   - installed with --tooling-dir (no scripts/vsdd/ here): the kit release recorded
+#     in openspec/.vsdd.json runs with uvx. The kit repository must be readable from
+#     CI for that.
 name: VSDD
 
 on:
@@ -15,7 +21,11 @@ on:
   pull_request:
     paths:
       - "openspec/**"
+      - "docs/MERMAID_RULES.md"
       - "scripts/vsdd/**"
+      - ".github/workflows/vsdd.yml"
+      - ".*/skills/openspec-*/**"
+      - ".*/command*/**"
 
 jobs:
   diagrams:
@@ -31,11 +41,30 @@ jobs:
         with:
           node-version: "22"
 
+      - uses: astral-sh/setup-uv@v5
+
       - name: Install mermaid-cli
-        run: npm install -g @mermaid-js/mermaid-cli
+        run: npm install -g @mermaid-js/mermaid-cli@11
+
+      - name: Find the VSDD tooling
+        run: |
+          if [ -f scripts/vsdd/validate_mermaid.py ]; then
+            echo "VSDD_VALIDATE=python3 scripts/vsdd/validate_mermaid.py" >> "$GITHUB_ENV"
+            echo "VSDD_OVERLAY=python3 scripts/vsdd/install_overlay.py" >> "$GITHUB_ENV"
+          else
+            version=$(python3 -c "import json; print(json.load(open('openspec/.vsdd.json'))['kit_version'])")
+            kit="uvx --from git+https://github.com/joecrowley/vsdd-kit@v$version vsdd-kit"
+            echo "VSDD_VALIDATE=$kit validate --root ." >> "$GITHUB_ENV"
+            echo "VSDD_OVERLAY=$kit overlay --root ." >> "$GITHUB_ENV"
+          fi
 
       - name: Lint and render diagrams (Source of Truth + active changes)
-        run: python3 scripts/vsdd/validate_mermaid.py --render
+        run: $VSDD_VALIDATE --render
 
       - name: Check VSDD skill overlay is applied
-        run: python3 scripts/vsdd/install_overlay.py --check
+        run: |
+          if ls -d .*/skills/openspec-*/ >/dev/null 2>&1; then
+            $VSDD_OVERLAY --check
+          else
+            echo "No OpenSpec skills in this repository (they live in a shared workspace folder): overlay not checked here."
+          fi

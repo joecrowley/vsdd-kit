@@ -1,6 +1,6 @@
 """`vsdd-kit`: run the kit without cloning it.
 
-  uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.1.1 vsdd-kit install --root . --tools claude
+  uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit install --root . --tools claude
 
 Each subcommand runs the kit script of the same job, with the same flags, so
 everything SETUP.md says about a script applies to its subcommand:
@@ -9,6 +9,9 @@ everything SETUP.md says about a script applies to its subcommand:
   status     files/scripts/vsdd/vsdd_install.py --status
   preflight  files/scripts/vsdd/openspec_preflight.py
   snapshot   files/scripts/vsdd/vsdd_snapshot.py
+  validate   files/scripts/vsdd/validate_mermaid.py   (pass --root <project>)
+  overlay    files/scripts/vsdd/install_overlay.py    (pass --root <project>)
+  merge      files/scripts/vsdd/merge_diagrams.py     (pass --root <project>)
   guide      print SETUP.md (--reference: docs/SETUP-REFERENCE.md)
   path       print the kit folder: use it as KIT in SETUP.md
 
@@ -32,6 +35,11 @@ COMMANDS = {
     "status": ("vsdd_install.py", ["--status"]),
     "preflight": ("openspec_preflight.py", []),
     "snapshot": ("vsdd_snapshot.py", []),
+    # The project-side scripts, for projects that don't hold a copy (--tooling-dir),
+    # e.g. in CI: `vsdd-kit validate --root . --render`.
+    "validate": ("validate_mermaid.py", []),
+    "overlay": ("install_overlay.py", []),
+    "merge": ("merge_diagrams.py", []),
 }
 
 
