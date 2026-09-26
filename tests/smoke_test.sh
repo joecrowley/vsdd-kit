@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end smoke test for the VSDD kit.
-# Creates a throwaway project, runs the SETUP.md steps non-interactively against the
+# Creates a throwaway project, runs the setup steps (SETUP.md, docs/SETUP-REFERENCE.md) non-interactively against the
 # installed OpenSpec CLI, and checks every Verify condition. Run it after changing the
 # kit or upgrading OpenSpec.
 #

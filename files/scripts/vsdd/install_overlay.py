@@ -448,7 +448,7 @@ def main() -> int:
             rel = display(path, root)
             if res.missing:
                 problems += 1
-                print(f"  ! {rel}: anchor not found for {', '.join(res.missing)} - apply by hand (see SETUP.md)")
+                print(f"  ! {rel}: anchor not found for {', '.join(res.missing)} - apply by hand (see Step 5 of the VSDD kit's docs/SETUP-REFERENCE.md)")
             if res.stale:
                 problems += 1
                 print(f"  ! {rel}: {', '.join(res.stale)} written by an older kit can't be refreshed in place - "

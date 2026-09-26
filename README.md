@@ -225,7 +225,7 @@ the quotes show up in the rendered output. The validator enforces all of these, 
 first saves a snapshot, outside the project, of what git can't restore: gitignored
 tool folders, untracked `/opsx` commands, your global OpenSpec config and the CLI
 version. Rolling back means switching branch, then running
-`vsdd_snapshot.py restore`. See "Roll back an install" in `SETUP.md`.
+`vsdd_snapshot.py restore`. See "Roll back an install" in [`docs/SETUP-REFERENCE.md`](docs/SETUP-REFERENCE.md).
 
 **Workspaces that share one folder of `/opsx` commands** (VS Code multi-root, Devin)
 are supported: the preflight finds the shared folder, the installer asks before
@@ -250,7 +250,7 @@ KEEP=1 tests/smoke_test.sh              # keep the temp project for inspection
 GLOBAL_PROFILE=1 tests/smoke_test.sh    # use your own OpenSpec workflow profile
 ```
 
-The test builds a throwaway project, runs the `SETUP.md` steps against your installed
+The test builds a throwaway project, runs the setup steps against your installed
 OpenSpec, and checks every Verify condition:
 
 - schema validity, and `context`/`rules` injection
@@ -285,7 +285,8 @@ in `install_overlay.py`.
 ```
 vsdd-kit/
 ├── README.md                    ← this file
-├── SETUP.md                     ← runbook for the AI agent
+├── SETUP.md                     ← runbook for the AI agent: the installer, then the judgement steps
+├── docs/SETUP-REFERENCE.md      ← Steps 0–5 by hand, workspaces, maintenance, troubleshooting, rollback
 ├── VERSION                      ← kit version, recorded in each install's openspec/.vsdd.json
 ├── .github/workflows/smoke.yml  ← the kit's own CI: smoke test, weekly against the latest OpenSpec
 ├── docs/WHY_VSDD.md             ← the case for adopting VSDD
