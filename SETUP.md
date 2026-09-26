@@ -27,7 +27,7 @@ there.
 
 | Name | Meaning |
 |---|---|
-| `KIT` | The directory containing this `SETUP.md`. Its files are under `KIT/files/`. If you are running the kit as a package (`vsdd-kit guide` printed this runbook), `KIT` is what `vsdd-kit path` prints, and every command below works with it. |
+| `KIT` | The directory containing this `SETUP.md`. Its files are under `KIT/files/`. If you printed this runbook with `uvx --from <source> vsdd-kit guide`, run the same command with `path` in place of `guide`: `KIT` is the folder it prints, and every command below works with it. `uvx` installs nothing, so there is no `vsdd-kit` command on your PATH: always run it as `uvx --from <source> vsdd-kit ...`. |
 | `ROOT` | The target project's root, where the setup is installed. Run commands from `ROOT`. |
 | `TOOLS` | The AI tools the team uses, as OpenSpec tool ids: `claude`, `opencode`, `qwen`, `cursor`, `codex`, `github-copilot`, `windsurf`, `gemini`, ... (full list: `openspec init --help`). |
 

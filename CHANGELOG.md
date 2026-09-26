@@ -10,6 +10,11 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Fixed
+- README and `SETUP.md` gave `KIT` as "what `vsdd-kit path` prints", but `uvx`
+  installs nothing, so there is no `vsdd-kit` on the PATH. They now give the full
+  `uvx --from <source> vsdd-kit path` command.
+
 ## [0.3.0] - 2026-09-26
 
 ### Added
