@@ -59,36 +59,43 @@ flowchart LR
    proposes a rule for `openspec/specs/architecture/decisions.md`. Later designs read
    that log first, so the same mistake isn't repeated in another capability.
 
-A change's `diagrams.md`:
+**See it on a real change:** [`examples/book-notes`](examples/book-notes) is an
+unedited run on a small Flutter app, with the proposed and built `diagrams.md`, the
+code, the merge output, and the Source of Truth before and after. The kit's tests
+replay it on every run. Its `diagrams.md` as built, with the diagrams cut:
 
 ````markdown
 ## Diagram needed?
 
-YES - adds a discount-code step to the checkout flow
+YES - adds a notes update path through data, domain and presentation, and new
+transitions to the ReadingListCubit state machine.
 
 ## Placement
 
-| Stable name | Source of Truth file | Action |
-|---|---|---|
-| Checkout Flow | specs/checkout/diagrams.md | update |
-| Discount Validation | specs/checkout/diagrams.md | add |
+| Stable name | Source of Truth file | Action | Why here |
+|---|---|---|---|
+| ReadingListState Machine | specs/architecture/diagrams.md | update | |
+| Status Update Flow | specs/architecture/diagrams.md | update | |
+| Notes Update Flow | specs/book-notes/diagrams.md | add | |
 
 ## Before State
-
-### Checkout Flow
-<verbatim copy from the Source of Truth>
+### ReadingListState Machine      (verbatim from the Source of Truth)
+### Status Update Flow            (verbatim, added when the code changed this flow)
 
 ## After State
-
-### Checkout Flow
-<updated diagram>
-
-### Discount Validation
-<new diagram - appended on archive>
+### ReadingListState Machine      (+ setNotes transitions)
+### Status Update Flow            (patchStatus -> patchBook)
+### Notes Update Flow             (new: appended to specs/book-notes/diagrams.md)
 
 ## Deviations
-- **Proposed:** the app validates discount codes locally. **Built:** validation
-  calls the pricing API. **Why:** discount rules change without an app release (design D2).
+
+- **Proposed:** `BookApi.patchNotes(id, text)`, next to `patchStatus` (design D3).
+  **Built:** one `BookApi.patchBook(id, changes)`, used for notes and status alike.
+  `ApiBookRepository.updateStatus` now calls `patchBook(id, {'status': ...})`, so the
+  Status Update Flow changed too, and got a Placement row.
+  **Why:** a reviewer asked for one PATCH path for all book fields during apply
+  (the redirect in the testdrive walkthrough, §5.5): it avoids a second copy of the
+  latency, lookup and 404 handling.
 ````
 
 ## Quick start
@@ -294,6 +301,8 @@ OpenSpec, and checks every Verify condition:
   then switch back and restore. The working tree and global config come back
   byte-identical.
 - recovery after `openspec update`
+- the worked example: replaying `examples/book-notes` reproduces its Source of Truth
+  byte for byte
 
 By default it uses an isolated OpenSpec config with **every workflow enabled**, so the
 result doesn't depend on your machine's profile, and all overlay patches are exercised.
@@ -316,6 +325,7 @@ vsdd-kit/
 ├── docs/WHY_VSDD.md             ← the case for adopting VSDD
 ├── docs/ARCHITECTURE.md         ← for contributors: how the scripts fit together
 ├── docs/concept-report.md       ← background: the research and concept behind VSDD
+├── examples/book-notes/         ← a real change, end to end: diagrams proposed and built, code, merge
 ├── tests/smoke_test.sh          ← end-to-end test
 └── files/                       ← mirrors the target project layout
     ├── openspec/                ← schema, templates, config example, Source of Truth skeleton

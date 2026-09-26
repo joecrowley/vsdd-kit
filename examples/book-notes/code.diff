@@ -1,0 +1,378 @@
+diff --git a/lib/app.dart b/lib/app.dart
+index 4e83e56..7ad3cc2 100644
+--- a/lib/app.dart
++++ b/lib/app.dart
+@@ -7,6 +7,7 @@ import 'data/book_api.dart';
+ import 'domain/book.dart';
+ import 'domain/book_repository.dart';
+ import 'domain/usecases/get_reading_list.dart';
++import 'domain/usecases/update_book_notes.dart';
+ import 'domain/usecases/update_reading_status.dart';
+ import 'presentation/book_detail/book_detail_screen.dart';
+ import 'presentation/reading_list/reading_list_cubit.dart';
+@@ -38,9 +39,11 @@ class ReadingListApp extends StatelessWidget {
+   Widget build(BuildContext context) {
+     final repo = repository ?? ApiBookRepository(BookApi());
+     return BlocProvider(
+-      create: (_) =>
+-          ReadingListCubit(GetReadingList(repo), UpdateReadingStatus(repo))
+-            ..load(),
++      create: (_) => ReadingListCubit(
++        GetReadingList(repo),
++        UpdateReadingStatus(repo),
++        UpdateBookNotes(repo),
++      )..load(),
+       child: MaterialApp.router(
+         title: 'Reading list',
+         theme: ThemeData(colorSchemeSeed: Colors.teal),
+diff --git a/lib/data/api_book_repository.dart b/lib/data/api_book_repository.dart
+index 651ea8b..bb46dd0 100644
+--- a/lib/data/api_book_repository.dart
++++ b/lib/data/api_book_repository.dart
+@@ -21,17 +21,28 @@ final class ApiBookRepository implements BookRepository {
+   @override
+   Future<Result<Book>> updateStatus(BookId id, ReadingStatus status) async {
+     try {
+-      final row = await _api.patchStatus(id.value, status.name);
++      final row = await _api.patchBook(id.value, {'status': status.name});
+       return Ok(_toBook(row));
+     } on Object catch (e) {
+       return Err(Exception('Failed to update ${id.value}: $e'));
+     }
+   }
+ 
++  @override
++  Future<Result<Book>> updateNotes(BookId id, String notes) async {
++    try {
++      final row = await _api.patchBook(id.value, {'notes': notes});
++      return Ok(_toBook(row));
++    } on Object catch (e) {
++      return Err(Exception('Failed to save notes for ${id.value}: $e'));
++    }
++  }
++
+   static Book _toBook(Map<String, Object?> row) => Book(
+     id: BookId(row['id']! as String),
+     title: row['title']! as String,
+     author: row['author']! as String,
+     status: ReadingStatus.values.byName(row['status']! as String),
++    notes: row['notes'] as String? ?? '',
+   );
+ }
+diff --git a/lib/data/book_api.dart b/lib/data/book_api.dart
+index 8adace4..95351da 100644
+--- a/lib/data/book_api.dart
++++ b/lib/data/book_api.dart
+@@ -10,18 +10,21 @@ class BookApi {
+       'title': 'The Pragmatic Programmer',
+       'author': 'Hunt & Thomas',
+       'status': 'reading',
++      'notes': '',
+     },
+     {
+       'id': 'b2',
+       'title': 'Designing Data-Intensive Applications',
+       'author': 'Kleppmann',
+       'status': 'wantToRead',
++      'notes': '',
+     },
+     {
+       'id': 'b3',
+       'title': 'Refactoring',
+       'author': 'Fowler',
+       'status': 'finished',
++      'notes': '',
+     },
+   ];
+ 
+@@ -30,13 +33,18 @@ class BookApi {
+     return List.unmodifiable(_rows.map(Map<String, Object?>.of));
+   }
+ 
+-  Future<Map<String, Object?>> patchStatus(String id, String status) async {
++  /// Updates the given fields of a book (e.g. `{'status': 'reading'}` or
++  /// `{'notes': '...'}`) and returns the updated row.
++  Future<Map<String, Object?>> patchBook(
++    String id,
++    Map<String, Object?> changes,
++  ) async {
+     await Future<void>.delayed(latency);
+     final row = _rows.firstWhere(
+       (r) => r['id'] == id,
+       orElse: () => throw StateError('404: book $id not found'),
+     );
+-    row['status'] = status;
++    row.addAll(changes);
+     return Map.of(row);
+   }
+ }
+diff --git a/lib/domain/book.dart b/lib/domain/book.dart
+index 7074d8f..26cdce6 100644
+--- a/lib/domain/book.dart
++++ b/lib/domain/book.dart
+@@ -10,6 +10,7 @@ final class Book extends Equatable {
+     required this.title,
+     required this.author,
+     this.status = ReadingStatus.wantToRead,
++    this.notes = '',
+   });
+ 
+   final BookId id;
+@@ -17,9 +18,17 @@ final class Book extends Equatable {
+   final String author;
+   final ReadingStatus status;
+ 
+-  Book copyWith({ReadingStatus? status}) =>
+-      Book(id: id, title: title, author: author, status: status ?? this.status);
++  /// The reader's private notes. Empty when there are none.
++  final String notes;
++
++  Book copyWith({ReadingStatus? status, String? notes}) => Book(
++    id: id,
++    title: title,
++    author: author,
++    status: status ?? this.status,
++    notes: notes ?? this.notes,
++  );
+ 
+   @override
+-  List<Object?> get props => [id, title, author, status];
++  List<Object?> get props => [id, title, author, status, notes];
+ }
+diff --git a/lib/domain/book_repository.dart b/lib/domain/book_repository.dart
+index a6c9531..e1ef0b4 100644
+--- a/lib/domain/book_repository.dart
++++ b/lib/domain/book_repository.dart
+@@ -5,4 +5,6 @@ abstract interface class BookRepository {
+   Future<Result<List<Book>>> fetchReadingList();
+ 
+   Future<Result<Book>> updateStatus(BookId id, ReadingStatus status);
++
++  Future<Result<Book>> updateNotes(BookId id, String notes);
+ }
+diff --git a/lib/domain/usecases/update_book_notes.dart b/lib/domain/usecases/update_book_notes.dart
+new file mode 100644
+index 0000000..0203255
+--- /dev/null
++++ b/lib/domain/usecases/update_book_notes.dart
+@@ -0,0 +1,12 @@
++import '../book.dart';
++import '../book_repository.dart';
++import '../result.dart';
++
++final class UpdateBookNotes {
++  const UpdateBookNotes(this._repository);
++
++  final BookRepository _repository;
++
++  Future<Result<Book>> call(BookId id, String notes) =>
++      _repository.updateNotes(id, notes);
++}
+diff --git a/lib/presentation/book_detail/book_detail_screen.dart b/lib/presentation/book_detail/book_detail_screen.dart
+index 721929d..b7fe8fd 100644
+--- a/lib/presentation/book_detail/book_detail_screen.dart
++++ b/lib/presentation/book_detail/book_detail_screen.dart
+@@ -39,9 +39,56 @@ class BookDetailScreen extends StatelessWidget {
+                         .read<ReadingListCubit>()
+                         .setStatus(book.id, selection.first),
+                   ),
++                  const SizedBox(height: 24),
++                  _NotesEditor(key: ValueKey(book.id), book: book),
+                 ],
+               ),
+             ),
+     );
+   }
+ }
++
++/// The book's private notes, saved with an explicit Save button.
++class _NotesEditor extends StatefulWidget {
++  const _NotesEditor({super.key, required this.book});
++
++  final Book book;
++
++  @override
++  State<_NotesEditor> createState() => _NotesEditorState();
++}
++
++class _NotesEditorState extends State<_NotesEditor> {
++  late final _controller = TextEditingController(text: widget.book.notes);
++
++  @override
++  void dispose() {
++    _controller.dispose();
++    super.dispose();
++  }
++
++  @override
++  Widget build(BuildContext context) {
++    return Column(
++      crossAxisAlignment: CrossAxisAlignment.end,
++      children: [
++        TextField(
++          controller: _controller,
++          maxLines: 5,
++          decoration: const InputDecoration(
++            labelText: 'Notes',
++            border: OutlineInputBorder(),
++          ),
++        ),
++        const SizedBox(height: 8),
++        FilledButton(
++          onPressed: () => context.read<ReadingListCubit>().setNotes(
++            widget.book.id,
++            _controller.text,
++          ),
++          child: const Text('Save'),
++        ),
++      ],
++    );
++  }
++}
+diff --git a/lib/presentation/reading_list/reading_list_cubit.dart b/lib/presentation/reading_list/reading_list_cubit.dart
+index f011cc2..baa6b8b 100644
+--- a/lib/presentation/reading_list/reading_list_cubit.dart
++++ b/lib/presentation/reading_list/reading_list_cubit.dart
+@@ -3,15 +3,20 @@ import 'package:flutter_bloc/flutter_bloc.dart';
+ import '../../domain/book.dart';
+ import '../../domain/result.dart';
+ import '../../domain/usecases/get_reading_list.dart';
++import '../../domain/usecases/update_book_notes.dart';
+ import '../../domain/usecases/update_reading_status.dart';
+ import 'reading_list_state.dart';
+ 
+ class ReadingListCubit extends Cubit<ReadingListState> {
+-  ReadingListCubit(this._getReadingList, this._updateReadingStatus)
+-    : super(const ReadingListInitial());
++  ReadingListCubit(
++    this._getReadingList,
++    this._updateReadingStatus,
++    this._updateBookNotes,
++  ) : super(const ReadingListInitial());
+ 
+   final GetReadingList _getReadingList;
+   final UpdateReadingStatus _updateReadingStatus;
++  final UpdateBookNotes _updateBookNotes;
+ 
+   Future<void> load() async {
+     emit(const ReadingListLoading());
+@@ -33,4 +38,15 @@ class ReadingListCubit extends Cubit<ReadingListState> {
+         emit(ReadingListError(e.toString()));
+     }
+   }
++
++  Future<void> setNotes(BookId id, String notes) async {
++    final result = await _updateBookNotes(id, notes);
++    if (isClosed) return;
++    switch (result) {
++      case Ok():
++        await load();
++      case Err(error: final e):
++        emit(ReadingListError(e.toString()));
++    }
++  }
+ }
+diff --git a/test/app_test.dart b/test/app_test.dart
+index b2f30ef..63a2972 100644
+--- a/test/app_test.dart
++++ b/test/app_test.dart
+@@ -1,3 +1,4 @@
++import 'package:flutter/material.dart';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:vsdd_testdrive/app.dart';
+ import 'package:vsdd_testdrive/domain/book.dart';
+@@ -19,4 +20,21 @@ void main() {
+ 
+     expect(find.text('Fowler'), findsOneWidget);
+   });
++
++  testWidgets('saves notes from the detail screen', (tester) async {
++    final repo = FakeBookRepository(const [
++      Book(id: BookId('1'), title: 'Refactoring', author: 'Fowler'),
++    ]);
++    await tester.pumpWidget(ReadingListApp(repository: repo));
++    await tester.pumpAndSettle();
++    await tester.tap(find.text('Refactoring'));
++    await tester.pumpAndSettle();
++
++    await tester.enterText(find.byType(TextField), 'Read before the rewrite');
++    await tester.tap(find.text('Save'));
++    await tester.pumpAndSettle();
++
++    expect(repo.books.single.notes, 'Read before the rewrite');
++    expect(find.text('Read before the rewrite'), findsOneWidget);
++  });
+ }
+diff --git a/test/reading_list_cubit_test.dart b/test/reading_list_cubit_test.dart
+index 234fb49..5d6dcf1 100644
+--- a/test/reading_list_cubit_test.dart
++++ b/test/reading_list_cubit_test.dart
+@@ -4,6 +4,7 @@ import 'package:vsdd_testdrive/domain/book.dart';
+ import 'package:vsdd_testdrive/domain/book_repository.dart';
+ import 'package:vsdd_testdrive/domain/result.dart';
+ import 'package:vsdd_testdrive/domain/usecases/get_reading_list.dart';
++import 'package:vsdd_testdrive/domain/usecases/update_book_notes.dart';
+ import 'package:vsdd_testdrive/domain/usecases/update_reading_status.dart';
+ import 'package:vsdd_testdrive/presentation/reading_list/reading_list_cubit.dart';
+ import 'package:vsdd_testdrive/presentation/reading_list/reading_list_state.dart';
+@@ -26,6 +27,13 @@ class FakeBookRepository implements BookRepository {
+     ];
+     return Ok(books.firstWhere((b) => b.id == id));
+   }
++
++  @override
++  Future<Result<Book>> updateNotes(BookId id, String notes) async {
++    if (fail) return Err(Exception('offline'));
++    books = [for (final b in books) b.id == id ? b.copyWith(notes: notes) : b];
++    return Ok(books.firstWhere((b) => b.id == id));
++  }
+ }
+ 
+ const _done = Book(
+@@ -41,8 +49,11 @@ const _reading = Book(
+   status: ReadingStatus.reading,
+ );
+ 
+-ReadingListCubit _cubit(FakeBookRepository repo) =>
+-    ReadingListCubit(GetReadingList(repo), UpdateReadingStatus(repo));
++ReadingListCubit _cubit(FakeBookRepository repo) => ReadingListCubit(
++  GetReadingList(repo),
++  UpdateReadingStatus(repo),
++  UpdateBookNotes(repo),
++);
+ 
+ void main() {
+   blocTest<ReadingListCubit, ReadingListState>(
+@@ -71,4 +82,32 @@ void main() {
+       ReadingListLoaded([_done.copyWith(status: ReadingStatus.reading)]),
+     ],
+   );
++
++  blocTest<ReadingListCubit, ReadingListState>(
++    'setNotes saves the notes and reloads',
++    build: () => _cubit(FakeBookRepository([_done])),
++    act: (c) => c.setNotes(const BookId('1'), 'Reread chapter 3'),
++    expect: () => [
++      const ReadingListLoading(),
++      ReadingListLoaded([_done.copyWith(notes: 'Reread chapter 3')]),
++    ],
++  );
++
++  blocTest<ReadingListCubit, ReadingListState>(
++    'setNotes with empty text clears the notes',
++    build: () =>
++        _cubit(FakeBookRepository([_done.copyWith(notes: 'old thoughts')])),
++    act: (c) => c.setNotes(const BookId('1'), ''),
++    expect: () => [
++      const ReadingListLoading(),
++      const ReadingListLoaded([_done]),
++    ],
++  );
++
++  blocTest<ReadingListCubit, ReadingListState>(
++    'setNotes emits Error when the save fails',
++    build: () => _cubit(FakeBookRepository([_done], fail: true)),
++    act: (c) => c.setNotes(const BookId('1'), 'x'),
++    expect: () => [isA<ReadingListError>()],
++  );
+ }

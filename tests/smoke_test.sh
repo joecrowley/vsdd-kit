@@ -411,6 +411,22 @@ HOME="$IH" python3 "$INST" --root . --tools none --extra-dir ../shared --tooling
   && pass "--tooling-dir <kit>/files: used in place, config repointed from the old tooling folder" || fail "--tooling-dir kit in place"
 cd "$ROOT"
 
+step "Worked example (examples/book-notes) replays exactly"
+EX="$KIT/examples/book-notes"
+RP="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-example.XXXXXX")"
+[ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT" "$XDG" "$ROOT2" "$XFULL" "$XLESS" "$ROOT3" "$XR" "$(dirname "$SNAP")" "$ROOT4" "$FH" "$ROOT5" "$IH" "$WS" "$RP"' EXIT
+mkdir -p "$RP/openspec/changes/archive"
+cp -R "$EX/specs-before" "$RP/openspec/specs"
+cp -R "$EX/change" "$RP/openspec/changes/archive/2026-09-26-add-book-notes"
+VAL="$KIT/files/scripts/vsdd/validate_mermaid.py"; MRG="$KIT/files/scripts/vsdd/merge_diagrams.py"
+python3 "$VAL" --root "$RP" --include-archive --strict-archive >/dev/null \
+  && pass "example change validates strictly against specs-before" || fail "example change no longer validates"
+python3 "$MRG" --root "$RP" "$RP/openspec/changes/archive/2026-09-26-add-book-notes" >/dev/null || fail "example merge failed"
+cmp -s "$RP/openspec/specs/architecture/diagrams.md" "$EX/specs-after/architecture/diagrams.md" \
+  && cmp -s "$RP/openspec/specs/book-notes/diagrams.md" "$EX/specs-after/book-notes/diagrams.md" \
+  && pass "replaying the example's merge reproduces specs-after byte for byte" || fail "example merge result differs from specs-after"
+python3 "$VAL" "$EX/README.md" "$EX/diagrams.proposed.md" >/dev/null && pass "example README and proposed diagrams lint clean" || fail "example diagrams lint"
+
 step "Package (vsdd-kit entry point)"
 if command -v uv >/dev/null; then
   PK="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-pkg.XXXXXX")"
