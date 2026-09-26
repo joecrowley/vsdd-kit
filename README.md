@@ -42,7 +42,7 @@ no longer exists.
 
 ```bash
 npm install -g @fission-ai/openspec
-uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit guide
+uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.1 vsdd-kit guide
 ```
 
 `guide` prints the runbook. Ask your agent to follow it: it installs, configures,
