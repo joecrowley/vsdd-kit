@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-26
+
 ### Added
 - `vsdd-kit validate`, `overlay` and `merge`: the project-side scripts, for projects
   installed with `--tooling-dir`, which hold no copy of them.
@@ -88,6 +90,7 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/joecrowley/vsdd-kit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/joecrowley/vsdd-kit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/joecrowley/vsdd-kit/releases/tag/v0.1.0

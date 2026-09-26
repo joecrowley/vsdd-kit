@@ -111,12 +111,12 @@ npm install -g @fission-ai/openspec
 Then open your project in your AI coding tool and say:
 
 > Install VSDD into this project: run
-> `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit guide`
+> `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.0 vsdd-kit guide`
 > and follow the runbook it prints. Use `vsdd-kit path` as `KIT`.
 
 This needs [uv](https://docs.astral.sh/uv/). `uvx` runs the kit from that release
 tag without cloning it or installing anything for good. `pipx run --spec
-git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit ...` works too.
+git+https://github.com/joecrowley/vsdd-kit@v0.3.0 vsdd-kit ...` works too.
 
 **Or clone it**, which you need for the kit-in-your-workspace setup
 (`--tooling-dir`, below) and for working on the kit:
@@ -140,7 +140,7 @@ decision is yours, and changes nothing until you've answered. You can also run i
 yourself:
 
 ```bash
-uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit install --root . --tools claude --dry-run
+uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.0 vsdd-kit install --root . --tools claude --dry-run
 python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --tools claude --dry-run   # from a clone
 ```
 
