@@ -1,0 +1,50 @@
+# The kit's own CI: runs tests/smoke_test.sh against a pinned OpenSpec (the version
+# the README says was checked) and against the latest release. The weekly run catches
+# an OpenSpec release that changes the stock skill text (`anchor not found`) before
+# users hit it.
+name: Smoke test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: OpenSpec ${{ matrix.openspec }}, Python ${{ matrix.python }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { openspec: "1.13.2", python: "3.12" }
+          - { openspec: "latest", python: "3.12" }
+          - { openspec: "1.13.2", python: "3.9" }   # the minimum the README promises
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install OpenSpec and mermaid-cli
+        run: |
+          npm install -g "@fission-ai/openspec@${{ matrix.openspec }}" @mermaid-js/mermaid-cli@11
+          pip install pyyaml
+          openspec --version
+
+      - name: Git identity for the test repos
+        run: |
+          git config --global user.name "vsdd-smoke"
+          git config --global user.email "vsdd-smoke@example.invalid"
+          git config --global init.defaultBranch main
+
+      - name: Smoke test
+        run: tests/smoke_test.sh

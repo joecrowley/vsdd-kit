@@ -153,7 +153,8 @@ python3 scripts/vsdd/validate_mermaid.py            # lint + change structure
 python3 scripts/vsdd/validate_mermaid.py --render   # also render with mermaid-cli
 python3 scripts/vsdd/merge_diagrams.py openspec/changes/<name> --dry-run   # preview the archive merge
 python3 scripts/vsdd/install_overlay.py             # re-apply after `openspec update`
-python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay was wiped
+python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay was wiped or is stale
+python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --status   # is this install behind the kit?
 ```
 
 ## What gets installed
@@ -170,6 +171,7 @@ python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay wa
 | `openspec/config.yaml` `operations` | The key VSDD steps, repeated as CLI guidance (newer OpenSpec) |
 | `.<tool>/command*/opsx-*` | Thin wrappers that load those skills |
 | `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before), `merge_diagrams.py` (the archive merge, deterministic), `install_overlay.py`, `openspec_preflight.py` (what `openspec update` would delete, tools to add), `vsdd_snapshot.py` (saves and restores what git can't). The installer, `vsdd_install.py`, runs from the kit and isn't copied |
+| `openspec/.vsdd.json` | Which kit version installed VSDD, with the tools and folders it used. `--status` and upgrades read it |
 | `.github/workflows/vsdd.yml` | CI: render every diagram and check the overlay (optional) |
 
 ## Design notes
@@ -211,6 +213,7 @@ the quotes show up in the rendered output. The validator enforces all of these, 
 | Before `openspec update` | `python3 scripts/vsdd/openspec_preflight.py`. If it would delete workflows, use `--safe-update` or add them to your profile |
 | After `openspec init` / `openspec update` | `python3 scripts/vsdd/install_overlay.py` |
 | After upgrading OpenSpec | Run `tests/smoke_test.sh` in this repo. On `anchor not found`, update the anchors in `install_overlay.py` |
+| After pulling a newer kit | `vsdd_install.py --root <project> --status`, then re-run the installer command it prints. Overlay blocks are refreshed in place |
 | When adding an AI tool | `openspec init --tools <tool>`, then the overlay |
 
 > **Caution:** `openspec update` also **removes** skills for workflows missing from
@@ -271,6 +274,8 @@ OpenSpec, and checks every Verify condition:
 
 By default it uses an isolated OpenSpec config with **every workflow enabled**, so the
 result doesn't depend on your machine's profile, and all overlay patches are exercised.
+The kit's own CI (`.github/workflows/smoke.yml`) runs it on every push, and weekly
+against the latest OpenSpec release, with Python 3.9 and 3.12.
 Run it after changing the kit and after every OpenSpec upgrade. An `anchor not found`
 from the overlay means the stock skill text changed, so update the `PATCHES` anchors
 in `install_overlay.py`.
@@ -281,6 +286,8 @@ in `install_overlay.py`.
 vsdd-kit/
 ├── README.md                    ← this file
 ├── SETUP.md                     ← runbook for the AI agent
+├── VERSION                      ← kit version, recorded in each install's openspec/.vsdd.json
+├── .github/workflows/smoke.yml  ← the kit's own CI: smoke test, weekly against the latest OpenSpec
 ├── docs/WHY_VSDD.md             ← the case for adopting VSDD
 ├── docs/ARCHITECTURE.md         ← for contributors: how the scripts fit together
 ├── docs/concept-report.md       ← background: the research and concept behind VSDD

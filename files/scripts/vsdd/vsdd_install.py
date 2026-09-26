@@ -16,6 +16,13 @@ It does SETUP.md Steps 0-5 and creates the decisions log:
      CLAUDE.md imports AGENTS.md for Claude Code
   5  skill and command overlay, then `--check`
   6  openspec/specs/architecture/decisions.md header (no rules are invented)
+  7  record the kit version, tools and folders in openspec/.vsdd.json
+
+Re-running it upgrades an install: files are copied again, and overlay blocks from
+an older kit are refreshed. `--status` compares an install with this kit and
+changes nothing:
+
+  python3 "$KIT"/files/scripts/vsdd/vsdd_install.py --root "$ROOT" --status
 
 It never makes a decision that SETUP.md marks ASK. When one is needed, it stops
 BEFORE changing anything (exit 3) and names the flag that records the answer:
@@ -41,6 +48,7 @@ and the report (Step 9), plus anything it could not merge safely.
 
 Exit codes: 0 installed (see the to-do list), 1 a step failed, 2 bad invocation or
 missing prerequisite, 3 stopped for a decision (nothing was changed).
+With --status: 0 up to date, 1 an upgrade is due, 2 VSDD isn't installed.
 """
 from __future__ import annotations
 
@@ -68,6 +76,9 @@ from openspec_preflight import (  # noqa: E402
 from install_overlay import PATCHES  # noqa: E402
 
 KIT_FILES = HERE.parent.parent
+KIT_VERSION = (KIT_FILES.parent / "VERSION").read_text(encoding="utf-8").strip() \
+    if (KIT_FILES.parent / "VERSION").is_file() else "unknown"
+STAMP = Path("openspec") / ".vsdd.json"
 SCRIPTS = ("validate_mermaid.py", "install_overlay.py", "merge_diagrams.py",
            "openspec_preflight.py", "vsdd_snapshot.py")
 SECTION = "## OpenSpec & Visual Spec-Driven Development"
@@ -103,6 +114,12 @@ def run(cmd: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedPr
 def version_tuple(text: str) -> tuple[int, ...]:
     m = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
     return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+
+
+def kit_commit() -> str | None:
+    """The kit clone's commit (tag-relative, `-dirty` if edited), or None outside git."""
+    proc = run(["git", "describe", "--tags", "--always", "--dirty"], KIT_FILES.parent, check=False)
+    return proc.stdout.strip() or None if proc.returncode == 0 else None
 
 
 class Installer:
@@ -235,6 +252,13 @@ class Installer:
         return (f"  VSDD tooling: its docs and scripts are in `{self.T}` (a folder of this workspace), not in this "
                 f"project. Read `{self.T}/docs/VSDD.md`; run scripts as `python3 {self.T}/scripts/vsdd/<script>.py "
                 f"--root {self.P}`.")
+
+    def portable(self, path: Path) -> str:
+        """A path for the committed stamp: ~/..., workspace-relative, or absolute as a last resort."""
+        home = Path.home()
+        if path.is_relative_to(home) and not any(path.is_relative_to(f) for f in self.ws_folders):
+            return f"~/{path.relative_to(home).as_posix()}"
+        return self.ws_ref(path)
 
     def default_agents_mode(self) -> str | None:
         """full for a new AGENTS.md, the existing choice on an upgrade, None = ASK."""
@@ -567,12 +591,34 @@ class Installer:
         self.done.append("6 decisions log: created (no entries)")
         self.decisions_created = True
 
+    def step7_stamp(self) -> None:
+        """Record what was installed, so `--status` and a later upgrade can compare."""
+        path = self.root / STAMP
+        self.plan.append(f"7 record the kit version in {STAMP.as_posix()}")
+        if self.args.dry_run:
+            return
+        stamp = {
+            "kit_version": KIT_VERSION,
+            "kit_commit": kit_commit(),
+            "openspec_version": self.version,
+            "tools": self.tools,
+            "extra_dirs": [self.portable(d) for d in self.extra_dirs],
+            "tooling_dir": self.T if self.tooling else None,
+        }
+        text = json.dumps(stamp, indent=2) + "\n"
+        old = path.read_text(encoding="utf-8") if path.exists() else None
+        if old != text:
+            path.write_text(text, encoding="utf-8")
+        self.done.append(f"7 {STAMP.as_posix()}: kit {KIT_VERSION}"
+                         + (f" ({stamp['kit_commit']})" if stamp["kit_commit"] else ""))
+
     # ------------------------------------------------------------------ main
     def run_all(self) -> int:
         self.prerequisites()
         self.inspect()
         for step in (self.step0_branch_and_snapshot, self.step1_openspec, self.step2_copy,
-                     self.step3_config, self.step4_agents, self.step5_overlay, self.step6_decisions):
+                     self.step3_config, self.step4_agents, self.step5_overlay, self.step6_decisions,
+                     self.step7_stamp):
             step()
         if not self.args.dry_run:
             self.todo += self.shared_notes
@@ -620,10 +666,112 @@ def replace_section(text: str, heading: str, snippet: str) -> str:
                      + lines[end:]).rstrip("\n") + "\n"
 
 
+def resolve_ref(ref: str, root: Path, folders: dict[Path, str]) -> Path | None:
+    """Undo Installer.portable(): ~/..., a workspace folder name plus path, or absolute."""
+    if ref.startswith("~"):
+        return Path(ref).expanduser()
+    if Path(ref).is_absolute():
+        return Path(ref)
+    head, _, rest = ref.partition("/")
+    for folder in folders:
+        if folder.name == head:
+            return folder / rest if rest else folder
+    return None
+
+
+def show_status(args: argparse.Namespace) -> int:
+    """Compare an install with this kit. Changes nothing."""
+    root = args.root.resolve()
+    if not (root / "openspec" / "schemas" / "visual-driven").is_dir():
+        print(f"VSDD is not installed in {root} (no openspec/schemas/visual-driven).")
+        return 2
+    stamp_path = root / STAMP
+    stamp = json.loads(stamp_path.read_text(encoding="utf-8")) if stamp_path.exists() else {}
+    folders = workspace_folders(root, [w.expanduser().resolve() for w in args.workspace], include_root=True)
+    due: list[str] = []
+    notes: list[str] = []
+
+    installed = stamp.get("kit_version")
+    if not installed:
+        due.append(f"no {STAMP.as_posix()}: installed by a kit older than 0.1.0")
+    elif installed != KIT_VERSION:
+        due.append(f"installed with kit {installed}, this kit is {KIT_VERSION}")
+    elif stamp.get("kit_commit") and stamp.get("kit_commit") != kit_commit():
+        notes.append(f"same kit version, different commit: installed {stamp['kit_commit']}, this kit {kit_commit()}")
+    if stamp.get("openspec_version") and stamp["openspec_version"] != run(["openspec", "--version"], root, check=False).stdout.strip():
+        notes.append(f"installed with OpenSpec {stamp['openspec_version']}; the CLI has changed since, "
+                     "so run the overlay check after any `openspec update`")
+
+    # Files the kit owns: they should match this kit byte for byte.
+    schema_src = KIT_FILES / "openspec" / "schemas" / "visual-driven"
+    pairs = [(f, root / "openspec" / "schemas" / "visual-driven" / f.relative_to(schema_src))
+             for f in sorted(schema_src.rglob("*")) if f.is_file()]
+    tooling = args.tooling_dir.expanduser().resolve() if args.tooling_dir else (
+        resolve_ref(stamp["tooling_dir"], root, folders) if stamp.get("tooling_dir") else root)
+    if tooling is None:
+        notes.append(f"can't find the tooling folder `{stamp['tooling_dir']}` (pass --tooling-dir or --workspace); "
+                     "docs and scripts not compared")
+    elif tooling.resolve() != KIT_FILES.resolve():
+        pairs += [(KIT_FILES / "docs" / "VSDD.md", tooling / "docs" / "VSDD.md")]
+        pairs += [(HERE / n, tooling / "scripts" / "vsdd" / n) for n in SCRIPTS]
+        rules = tooling / "docs" / "MERMAID_RULES.md"
+        if rules.is_file() and rules.read_bytes() != (KIT_FILES / "docs" / "MERMAID_RULES.md").read_bytes():
+            notes.append("docs/MERMAID_RULES.md differs from the kit (fine if it holds project rules; "
+                         "merge kit additions by hand)")
+    stale_files = []
+    for src, dst in pairs:
+        if not dst.is_file() or dst.read_bytes() != src.read_bytes():
+            try:
+                stale_files.append(dst.relative_to(root).as_posix())
+            except ValueError:
+                stale_files.append(str(dst))
+    if stale_files:
+        due.append(f"files differ from this kit: {', '.join(stale_files)}")
+
+    config = root / "openspec" / "config.yaml"
+    text = config.read_text(encoding="utf-8") if config.exists() else ""
+    missing = sorted({f"{k}.{s}" for k, s, marker in CONFIG_MARKERS if marker not in (top_level_block(text, k) or "")})
+    if missing:
+        due.append(f"config.yaml lacks VSDD entries: {', '.join(missing)}")
+
+    extra = [p for p in (resolve_ref(r, root, folders) for r in stamp.get("extra_dirs", [])) if p is not None]
+    extra += [d.expanduser().resolve() for d in args.extra_dir]
+    cmd = [sys.executable, str(HERE / "install_overlay.py"), "--root", str(root), "--check"]
+    for d in extra:
+        cmd += ["--extra-dir", str(d)]
+    check = run(cmd, root, check=False)
+    if check.returncode != 0:
+        due.append("overlay missing or stale:\n" + "\n".join(
+            f"      {l.strip()}" for l in check.stdout.splitlines() if l.lstrip().startswith(("x", "!"))))
+
+    tools = ",".join(stamp.get("tools") or []) or "<TOOLS>"
+    upgrade = [f"python3 {HERE / 'vsdd_install.py'}", f"--root {root}", f"--tools {tools}"]
+    upgrade += [f"--extra-dir {d}" for d in extra]
+    if stamp.get("tooling_dir") and tooling is not None:
+        upgrade.append(f"--tooling-dir {tooling}")
+    result = {"status": "upgrade-due" if due else "up-to-date", "kit_version": KIT_VERSION,
+              "kit_commit": kit_commit(), "installed": stamp or None, "due": due, "notes": notes,
+              "upgrade_command": " ".join(upgrade) if due else None}
+    if args.json:
+        print(json.dumps(result, indent=2))
+        return 1 if due else 0
+    print(f"This kit:   {KIT_VERSION}" + (f" ({result['kit_commit']})" if result["kit_commit"] else ""))
+    print(f"Installed:  {installed or 'unknown'}" + (f" ({stamp['kit_commit']})" if stamp.get("kit_commit") else ""))
+    for n in notes:
+        print(f"  note: {n}")
+    if not due:
+        print("Up to date.")
+        return 0
+    print("Upgrade due:")
+    print("\n".join(f"  - {d}" for d in due))
+    print(f"To upgrade (on a branch), re-run the installer:\n  {result['upgrade_command']}")
+    return 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root", type=Path, required=True, help="the project to install into")
-    ap.add_argument("--tools", required=True,
+    ap.add_argument("--tools",
                     help="comma-separated OpenSpec tool ids, e.g. claude,qwen; `none` when the commands "
                          "come from a shared workspace folder (--extra-dir)")
     ap.add_argument("--extra-dir", type=Path, action="append", default=[],
@@ -645,7 +793,13 @@ def main() -> int:
                     help="how VSDD appears in an existing AGENTS.md: routing section, one-line pointer, or not at all")
     ap.add_argument("--dry-run", action="store_true", help="check for decisions and print the plan only")
     ap.add_argument("--json", action="store_true", help="machine-readable result")
+    ap.add_argument("--status", action="store_true",
+                    help="compare the install with this kit and say whether an upgrade is due; changes nothing")
     args = ap.parse_args()
+    if args.status:
+        return show_status(args)
+    if not args.tools:
+        ap.error("--tools is required (except with --status)")
 
     inst = Installer(args)
     status, message = 0, ""

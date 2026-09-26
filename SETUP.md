@@ -70,6 +70,9 @@ before changing anything and names the flag that records the user's answer.
 
 Add `--json` for machine-readable output. Re-running the installer is safe: it
 upgrades an existing install, and on the install branch a re-run changes nothing.
+It records the kit version, tools and folders in `openspec/.vsdd.json`; commit that
+file with the rest. `--status` compares an install with the kit and changes nothing
+(exit 0 up to date, 1 upgrade due, 2 not installed).
 
 The numbered steps below are what the installer does, and the reference for the
 judgement steps. Follow them by hand only for a step the installer left to you or
@@ -580,7 +583,7 @@ Pass the folder to `vsdd_snapshot.py save --extra-dir` too, so a rollback covers
 | OpenSpec upgraded to a new minor or major version | Run the overlay with `--dry-run` first. On `anchor not found`, see Step 5 |
 | A new AI tool is added | `openspec update` (after adding the tool via `openspec init --tools`), then the overlay |
 | Before a kit upgrade or `openspec update` | Branch, then `python3 scripts/vsdd/vsdd_snapshot.py save`, so you can roll back |
-| Kit upgraded | Re-run Steps 2, 3 (new `rules`/`operations` entries, e.g. the Placement and decisions rules) and 4, and item 6 of Step 6 if there's no `decisions.md` yet. Changes still in flight need a `## Placement` table added before they validate. For Step 5, first restore stock skills with `openspec update`, then run the overlay. Blocks already marked `vsdd:` are skipped, so their text only refreshes from stock |
+| Kit upgraded (`git pull` in the kit) | `python3 "$KIT"/files/scripts/vsdd/vsdd_install.py --root "$ROOT" --status`. If an upgrade is due, branch, then run the command it prints: the installer re-copies the kit files, adds new config entries and refreshes overlay blocks in place (each ends with `<!-- /vsdd:<id> -->`). If the overlay reports a block "written by an older kit" it can't find whole, restore stock skills with `openspec update`, then re-run. Changes still in flight may need new sections (e.g. `## Placement`) before they validate |
 
 ## Troubleshooting
 

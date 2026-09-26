@@ -33,7 +33,7 @@ flowchart TD
 
 | Script | Job | Run by |
 |---|---|---|
-| `vsdd_install.py` | Steps 0–5 of `SETUP.md` in one go. Never makes an ASK decision: stops with exit 3 and names the flag | The agent (fast path), or you. Runs from the kit, never copied into projects |
+| `vsdd_install.py` | Steps 0–5 of `SETUP.md` in one go, then records the kit version in `openspec/.vsdd.json`. Never makes an ASK decision: stops with exit 3 and names the flag. `--status` compares an install with the kit | The agent (fast path), or you. Runs from the kit, never copied into projects |
 | `openspec_preflight.py` | Reports what `openspec update` would delete, tools to add, custom schemas, in-flight changes and shared workspace folders. `--safe-update` | The agent (manual path), the installer (imported), you before an `openspec update` |
 | `install_overlay.py` | Inserts the marked VSDD blocks into the `openspec-*` skills, refreshes single-line ones, and turns `/opsx` commands into wrappers. `--check` for CI | The installer, and you after every `openspec init` / `update` |
 | `validate_mermaid.py` | Mermaid lint, change structure (Placement, verbatim Before, ownership), decisions log. `--render` parses with mermaid-cli | The patched skills, CI, you |
@@ -51,8 +51,12 @@ flowchart TD
 
 ## Invariants worth keeping
 
-- The overlay only adds marked blocks (`<!-- vsdd:<id> -->`), so re-running it is safe
-  and `--check` can tell a wiped skill from a patched one.
+- The overlay only adds marked blocks (`<!-- vsdd:<id> -->`, and for multi-line blocks
+  a closing `<!-- /vsdd:<id> -->`), so re-running it is safe, a kit upgrade replaces
+  each block whole, and `--check` can tell a wiped or stale skill from a patched one.
+  Never change a block's `<id>`: that is how an upgrade finds it.
+- The kit version lives in `VERSION`. Bump it when a change alters what gets
+  installed, so `--status` reports existing installs as behind.
 - Scripts that write (`merge_diagrams.py`, the installer) validate or inspect first,
   and change nothing when they refuse.
 - Every behaviour above has a check in `tests/smoke_test.sh`. A change to a script

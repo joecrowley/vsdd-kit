@@ -86,6 +86,22 @@ before="$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)"
 python3 scripts/vsdd/install_overlay.py >/dev/null
 [ "$before" = "$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)" ] && pass "overlay idempotent" || fail "overlay not idempotent"
 grep -q "vsdd:wrapper" .*/command*/opsx*archive* .*/commands/opsx/archive.md 2>/dev/null && pass "commands wrapped" || fail "commands not wrapped"
+SK="$(ls .*/skills/openspec-apply-change/SKILL.md | head -1)"
+sed -i.bak 's/trace `## After State`/trace the old `## After State`/' "$SK" && rm -f "$SK.bak"
+grep -q "overlay stale" <<<"$(python3 scripts/vsdd/install_overlay.py --check 2>&1 || true)" && pass "--check reports a block from an older kit as stale" || fail "stale block not detected"
+python3 scripts/vsdd/install_overlay.py >/dev/null && python3 scripts/vsdd/install_overlay.py --check >/dev/null && ! grep -q "the old" "$SK" \
+  && pass "re-running the overlay refreshes a changed block (kit upgrade)" || fail "changed block not refreshed"
+sed -i.bak '/<!-- \/vsdd:apply-trace -->/d' "$SK" && rm -f "$SK.bak"
+python3 scripts/vsdd/install_overlay.py >/dev/null && grep -q "<!-- /vsdd:apply-trace -->" "$SK" && python3 scripts/vsdd/install_overlay.py --check >/dev/null \
+  && pass "a block without an end marker (older kit, same text) is migrated" || fail "legacy block not migrated"
+sed -i.bak '/<!-- \/vsdd:apply-trace -->/d; s/^6a\. \*\*Verify/6a. **Old verify/' "$SK" && rm -f "$SK.bak"
+grep -q "can't be refreshed in place" <<<"$(python3 scripts/vsdd/install_overlay.py 2>&1 || true)" \
+  && pass "an unrecognisable older block is reported, not guessed at" || fail "unrecognisable legacy block not reported"
+openspec update --force . </dev/null >/dev/null 2>&1 && python3 scripts/vsdd/install_overlay.py >/dev/null || fail "restore after legacy test"
+W="$(ls .*/commands/opsx/archive.md .*/command*/opsx-archive.md 2>/dev/null | head -1)"
+sed -i.bak 's/follow it exactly/follow it/' "$W" && rm -f "$W.bak"
+grep -q "wrapper stale" <<<"$(python3 scripts/vsdd/install_overlay.py --check 2>&1 || true)" && python3 scripts/vsdd/install_overlay.py >/dev/null \
+  && grep -q "follow it exactly" "$W" && pass "stale command wrapper detected and refreshed" || fail "stale wrapper not refreshed"
 grep -q "vsdd:archive-decisions" .*/skills/openspec-archive-change/SKILL.md && grep -q "vsdd:gen-decisions" .*/skills/openspec-propose/SKILL.md \
   && pass "decisions steps patched into propose and archive" || fail "decisions steps missing"
 for s in propose apply-change verify-change archive-change continue-change ff-change update-change bulk-archive-change; do
@@ -320,6 +336,14 @@ CLAUDE_OK=1; [[ "$TOOLS" == *claude* ]] && ! grep -q "@AGENTS.md" CLAUDE.md 2>/d
   && pass "installer: decisions log, no leftover check change, CLAUDE.md" || fail "installer: files"
 grep -q "fill in \`context:\`" <<<"$OUT" && grep -q "Step 6: seed" <<<"$OUT" \
   && pass "installer lists the judgement steps left (context, baseline diagrams)" || fail "installer to-do list"
+python3 -c "import json,sys; d=json.load(open('openspec/.vsdd.json')); sys.exit(d['kit_version'] != open(sys.argv[1]).read().strip())" "$KIT/VERSION" \
+  && pass "installer records the kit version in openspec/.vsdd.json" || fail "install stamp missing or wrong"
+python3 "$INST" --root . --status >/dev/null && pass "--status: up to date after install" || fail "--status after install"
+cp scripts/vsdd/validate_mermaid.py "$ROOT5.bak"; echo "# local edit" >> scripts/vsdd/validate_mermaid.py
+rc=0; OUT="$(python3 "$INST" --root . --status 2>&1)" || rc=$?
+[ "$rc" = 1 ] && grep -q "validate_mermaid.py" <<<"$OUT" && grep -q -- "--tools $TOOLS" <<<"$OUT" \
+  && pass "--status: a stale script means an upgrade is due, with the command to run" || fail "--status missed a stale script (exit $rc)"
+mv "$ROOT5.bak" scripts/vsdd/validate_mermaid.py
 git add -A; git -c user.email=s@t -c user.name=smoke commit -qm install
 NSNAP=$(ls "$IH/.vsdd-snapshots" | wc -l)
 HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 && [ -z "$(git status --porcelain)" ] \
