@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in the kit didn't work - install, overlay, validator, merge, or the vsdd-kit command
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The machine-readable output below usually shows the cause straight away.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: "`openspec --version`, `python3 --version`, `vsdd-kit --version` (or the kit commit), and your OS"
+      placeholder: "OpenSpec 1.13.2, Python 3.12.8, vsdd-kit 0.2.0, macOS 26"
+    validations:
+      required: true
+  - type: input
+    id: tools
+    attributes:
+      label: AI tools
+      description: The `--tools` you installed for, and whether you use a shared workspace folder or --tooling-dir
+      placeholder: "claude,cursor - no shared folder"
+  - type: textarea
+    id: output
+    attributes:
+      label: Installer or status output
+      description: "`vsdd-kit install ... --json`, or `vsdd-kit status --root <project> --json` for an existing install. For a diagram problem, paste the change's diagrams.md and the validator output instead."
+      render: text
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Anything that seems relevant, e.g. whether it happened after an `openspec update`.

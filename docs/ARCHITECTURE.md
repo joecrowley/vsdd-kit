@@ -40,7 +40,7 @@ flowchart TD
 | `install_overlay.py` | Inserts the marked VSDD blocks into the `openspec-*` skills, refreshes single-line ones, and turns `/opsx` commands into wrappers. `--check` for CI | The installer, and you after every `openspec init` / `update` |
 | `validate_mermaid.py` | Mermaid lint, change structure (Placement, verbatim Before, ownership), decisions log. `--render` parses with mermaid-cli | The patched skills, CI, you |
 | `merge_diagrams.py` | The archive merge: applies Placement rows (remove, move, update, add), refuses if the Source of Truth changed | The patched archive skill |
-| `vsdd_kit/cli.py` | The `vsdd-kit` command when the kit is installed as a package: runs the scripts above by name (`install`, `status`, ...), prints the guides, and `path` names the kit folder inside the package. The wheel holds the kit in the repository's layout (`pyproject.toml`) | You, or the agent, via `uvx` / `pipx` |
+| `vsdd_kit/cli.py` | The `vsdd-kit` command when the kit is installed as a package: runs the scripts above by name (`install`, `status`, `validate`, `overlay`, `merge`, ...), prints the guides, and `path` names the kit folder inside the package. The wheel holds the kit in the repository's layout (`pyproject.toml`) | You, or the agent, via `uvx` / `pipx` |
 | `vsdd_snapshot.py` | Saves and restores what git can't: untracked install files and the global OpenSpec config | The installer (save), you (restore) |
 
 ## Where the pieces end up
@@ -58,8 +58,10 @@ flowchart TD
   a closing `<!-- /vsdd:<id> -->`), so re-running it is safe, a kit upgrade replaces
   each block whole, and `--check` can tell a wiped or stale skill from a patched one.
   Never change a block's `<id>`: that is how an upgrade finds it.
-- The kit version lives in `VERSION`. Bump it when a change alters what gets
-  installed, so `--status` reports existing installs as behind.
+- The kit version lives in `VERSION`, and changes only in a release commit, together
+  with the tag `v<VERSION>` (see `CONTRIBUTING.md`, "Releasing"). Installs record it,
+  `--status` compares against it, and the CI template fetches that tag, so a version
+  without a tag would break CI in projects installed from it.
 - Scripts that write (`merge_diagrams.py`, the installer) validate or inspect first,
   and change nothing when they refuse.
 - Every behaviour above has a check in `tests/smoke_test.sh`. A change to a script

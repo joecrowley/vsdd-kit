@@ -453,6 +453,33 @@ if command -v uv >/dev/null; then
     && pass "packaged install records the version, and no commit (not a clone)" || fail "packaged install stamp"
   VK status --root . >/dev/null && pass "vsdd-kit status: up to date" || fail "vsdd-kit status"
   echo "# local edit" >> scripts/vsdd/merge_diagrams.py
+  # The CI template's own step scripts, run against both kinds of install.
+  ci_step() {  # $1 = step name: print its run script
+    python3 -c "import sys,yaml; d=yaml.safe_load(open(sys.argv[1])); print(next(st['run'] for st in d['jobs']['diagrams']['steps'] if st.get('name') == sys.argv[2]))" "$KIT/files/ci/github/vsdd.yml" "$1"
+  }
+  ci_run() {  # $1 = project dir, $2 = wheel substitute for the git source ('' = none): run the template's steps
+    ( cd "$1"; export GITHUB_ENV="$PK/ci.env"; : > "$GITHUB_ENV"
+      bash -e -c "$(ci_step "Find the VSDD tooling")"
+      src="uvx --from git+https://github.com/joecrowley/vsdd-kit@v$(cat "$KIT/VERSION")"
+      while IFS='=' read -r k v; do
+        [ -n "$2" ] && v="${v/"$src"/uvx -q --from $2}"
+        export "$k=$v"
+      done < "$GITHUB_ENV"
+      cp "$GITHUB_ENV" "$PK/ci.env.used"
+      bash -e -c "$(ci_step "Lint and render diagrams (Source of Truth + active changes)" | sed 's/ --render//')"
+      bash -e -c "$(ci_step "Check VSDD skill overlay is applied")" )
+  }
+  if python3 -c "import yaml" 2>/dev/null; then
+    ci_run "$PK/app" "" >/dev/null && grep -q "^VSDD_VALIDATE=python3 scripts/vsdd/validate_mermaid.py" "$PK/ci.env.used" \
+      && pass "CI template: uses the project's own scripts when it has them" || fail "CI template (scripts in the project)"
+    OUT="$(ci_run "$WS/app" "$WHL" 2>&1)" \
+      && grep -q "vsdd-kit@v$(cat "$KIT/VERSION") vsdd-kit validate --root ." "$PK/ci.env" \
+      && grep -q "overlay not checked here" <<<"$OUT" \
+      && pass "CI template: --tooling-dir install runs the recorded kit release, skips the shared-folder overlay" \
+      || { echo "$OUT"; fail "CI template (--tooling-dir install)"; }
+  else
+    echo "  skip  CI template steps (PyYAML not installed)"
+  fi
   OUT="$(VK status --root . || true)"
   grep -q "vsdd-kit install --root" <<<"$OUT" && pass "vsdd-kit status prints a vsdd-kit upgrade command" || fail "status upgrade command"
   cd "$ROOT"
