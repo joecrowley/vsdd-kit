@@ -1,6 +1,6 @@
 """`vsdd-kit`: run the kit without cloning it.
 
-  uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.0 vsdd-kit install --root . --tools claude
+  uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.1 vsdd-kit install --root . --tools claude
 
 Each subcommand runs the kit script of the same job, with the same flags, so
 everything SETUP.md says about a script applies to its subcommand:
