@@ -1,0 +1,22 @@
+name: Idea or friction
+description: Where VSDD got in the way, or something it should do
+labels: [idea]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: What were you trying to do?
+      description: The situation, not the solution. For example "a refactor touched eight diagrams and the review took an hour".
+    validations:
+      required: true
+  - type: textarea
+    id: friction
+    attributes:
+      label: Where did VSDD get in the way, or fall short?
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: What would help?
+      description: Optional. A suggestion, if you have one.

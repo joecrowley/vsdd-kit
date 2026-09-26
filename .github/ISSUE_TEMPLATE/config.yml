@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: The case for VSDD
+    url: https://github.com/joecrowley/vsdd-kit/blob/main/docs/WHY_VSDD.md
+    about: Benefits, costs and objections, if you're deciding whether VSDD fits your team.
