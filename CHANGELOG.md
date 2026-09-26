@@ -11,6 +11,12 @@ command that `status` prints.
 ## [Unreleased]
 
 ### Fixed
+- Reinstalling after a rollback reused the old install's snapshot. When a project
+  had an earlier `vsdd-install` branch (deleted since), the installer took the
+  snapshot of that old install as its own, so a later rollback, with
+  `--restore-global`, could put back a months-old global OpenSpec config. A new
+  install branch now always gets a new snapshot. A re-run only reuses a snapshot
+  taken after its branch was created.
 - README and `SETUP.md` gave `KIT` as "what `vsdd-kit path` prints", but `uvx`
   installs nothing, so there is no `vsdd-kit` on the PATH. They now give the full
   `uvx --from <source> vsdd-kit path` command.

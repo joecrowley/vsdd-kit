@@ -350,6 +350,15 @@ HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 && [ -z "$(
   && pass "re-run (upgrade) is idempotent" || fail "re-run changed files: $(git status --porcelain | head -3)"
 [ "$(ls "$IH/.vsdd-snapshots" | wc -l)" = "$NSNAP" ] && pass "re-run on the install branch reuses the pre-install snapshot" \
   || fail "re-run took a new snapshot of a half-installed state"
+ROOT8="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-again.XXXXXX")"
+cd "$ROOT8"; git init -q -b main; echo "# again" > README.md; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base
+HOME="$IH" python3 "$INST" --root . --tools claude --agents-md skip >/dev/null 2>&1 || fail "first install (reinstall test)"
+git switch -q main && git clean -qfd && git branch -q -D vsdd-install   # roll back, as the walkthrough's quick reset does
+sleep 1                                                                # snapshot names have 1-second resolution
+OUT="$(HOME="$IH" python3 "$INST" --root . --tools claude --agents-md skip 2>&1)" || fail "second install (reinstall test)"
+grep -q "0 snapshot: reusing" <<<"$OUT" && fail "a new install branch reused the old install's snapshot: $(grep 'snapshot' <<<"$OUT")" \
+  || pass "a new install branch (same name as a deleted one) takes its own snapshot"
+cd "$ROOT5"; rm -rf "$ROOT8"
 HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" --agents-md pointer >/dev/null 2>&1 \
   && grep -q "vsdd:pointer" AGENTS.md && ! grep -q "^## OpenSpec & Visual" AGENTS.md \
   && pass "--agents-md pointer replaces the section with one line" || fail "--agents-md pointer"
