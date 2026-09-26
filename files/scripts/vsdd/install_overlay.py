@@ -9,7 +9,9 @@ This script re-applies the VSDD additions:
   skills   - inserts diagram and decisions-log steps into openspec-{propose,continue-change,
              ff-change,update-change,apply-change,verify-change,
              archive-change,bulk-archive-change} at anchor lines. Idempotent: each insertion
-             carries a `<!-- vsdd:<id> -->` marker and is skipped if present. A guard line
+             carries a `<!-- vsdd:<id> -->` marker (multi-line blocks also end with
+             `<!-- /vsdd:<id> -->`); a block that is present is replaced when this kit's
+             text differs, so upgrading the kit refreshes it. A guard line
              at the top of each skill makes the VSDD steps no-ops in projects without
              docs/VSDD.md, so a skill folder shared by several projects can be patched.
   commands - rewrites the matching /opsx command files as thin wrappers that
@@ -18,8 +20,8 @@ This script re-applies the VSDD additions:
 Usage (from the project root):
   python3 scripts/vsdd/install_overlay.py            # apply
   python3 scripts/vsdd/install_overlay.py --dry-run  # show what would change
-  python3 scripts/vsdd/install_overlay.py --check    # exit 1 if overlay missing
-                                                     # (use in CI after updates)
+  python3 scripts/vsdd/install_overlay.py --check    # exit 1 if overlay missing or
+                                                     # stale (use in CI after updates)
 
 Exit codes: 0 ok, 1 overlay missing (--check) or an anchor was not found,
 2 no OpenSpec skills found.
@@ -59,6 +61,14 @@ GUARD = """\
 FRONTMATTER_END = "<frontmatter-end>"  # anchor: the line after the closing `---` of the YAML front matter
 
 GEN_DECISIONS = """\
+<!-- vsdd:gen-decisions -->
+- Before writing design.md (or tasks.md, when the change has no design), read
+  `openspec/specs/architecture/decisions.md` if it exists and follow every rule
+  that applies. To break one deliberately, write `Overrides: <Stable Name> - <why>`
+  under Decisions in design.md.
+"""
+# Kits before end markers carried this block's marker on its last line.
+GEN_DECISIONS_LEGACY = """\
 - Before writing design.md (or tasks.md, when the change has no design), read
   `openspec/specs/architecture/decisions.md` if it exists and follow every rule
   that applies. To break one deliberately, write `Overrides: <Stable Name> - <why>`
@@ -176,20 +186,38 @@ class Patch:
     where: str                # "before" | "after"
     text: str
     required: bool = True
+    legacy: str | None = None  # the block as kits without end markers wrote it, if it differs
+
+    def block(self) -> list[str]:
+        """The lines to insert. Multi-line blocks end with `<!-- /vsdd:<id> -->`, so a
+        later kit can find the whole block and replace it."""
+        lines = self.text.rstrip("\n").split("\n")
+        return lines if len(lines) == 1 else lines + [end_marker(self.pid)]
+
+    def legacy_block(self) -> list[str]:
+        return (self.legacy or self.text).rstrip("\n").split("\n")
+
+
+def start_marker(pid: str) -> str:
+    return f"<!-- vsdd:{pid} -->"
+
+
+def end_marker(pid: str) -> str:
+    return f"<!-- /vsdd:{pid} -->"
 
 
 PATCHES: dict[str, list[Patch]] = {
     "openspec-propose": [
         Patch("propose-list", (r"^- proposal\.md\b",), "after", PROPOSE_LIST, required=False),
-        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS),
+        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS, legacy=GEN_DECISIONS_LEGACY),
         Patch("gen-diagrams", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DIAGRAMS),
     ],
     "openspec-continue-change": [
-        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS),
+        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS, legacy=GEN_DECISIONS_LEGACY),
         Patch("gen-diagrams", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DIAGRAMS),
     ],
     "openspec-ff-change": [
-        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS),
+        Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS, legacy=GEN_DECISIONS_LEGACY),
         Patch("gen-diagrams", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DIAGRAMS),
     ],
     "openspec-update-change": [
@@ -279,18 +307,44 @@ def walk(base: Path, depth: int = 4):
             yield entry
 
 
-def apply_patches(text: str, patches: list[Patch]) -> tuple[str, list[str], list[str]]:
-    applied: list[str] = []
-    missing: list[str] = []
+@dataclass
+class Result:
+    text: str
+    inserted: list[str]   # blocks that were missing
+    refreshed: list[str]  # blocks present but different from this kit's text
+    stale: list[str]      # blocks from an older kit that can't be found whole
+    missing: list[str]    # required blocks whose anchor wasn't found
+
+
+def apply_patches(text: str, patches: list[Patch]) -> Result:
+    res = Result("", [], [], [], [])
     lines = text.split("\n")
     for patch in patches:
-        present = [i for i, l in enumerate(lines) if f"<!-- vsdd:{patch.pid} -->" in l]
+        block = patch.block()
+        present = [i for i, l in enumerate(lines) if start_marker(patch.pid) in l]
         if present:
-            block = patch.text.rstrip("\n")
-            # Single-line blocks carry their marker inline, so they can be refreshed in place.
-            if "\n" not in block and lines[present[0]] != block:
-                lines[present[0]] = block
-                applied.append(f"{patch.pid} (refreshed)")
+            i = present[0]
+            if len(block) == 1:
+                # Single-line blocks carry their marker inline, so they can be refreshed in place.
+                if lines[i] != block[0]:
+                    lines[i] = block[0]
+                    res.refreshed.append(patch.pid)
+                continue
+            end = next((j for j in range(i, len(lines)) if end_marker(patch.pid) in lines[j]), None)
+            if end is not None:
+                if lines[i:end + 1] != block:
+                    lines[i:end + 1] = block
+                    res.refreshed.append(patch.pid)
+                continue
+            # No end marker: written by an older kit. If it is still this kit's text,
+            # add the end marker; otherwise its extent is unknown.
+            legacy = patch.legacy_block()
+            s = i - next(n for n, l in enumerate(legacy) if start_marker(patch.pid) in l)
+            if s >= 0 and lines[s:s + len(legacy)] == legacy:
+                lines[s:s + len(legacy)] = block
+                res.refreshed.append(patch.pid)
+            else:
+                res.stale.append(patch.pid)
             continue
         idx = None
         for anchor in patch.anchors:
@@ -306,17 +360,17 @@ def apply_patches(text: str, patches: list[Patch]) -> tuple[str, list[str], list
                 break
         if idx is None:
             if patch.required:
-                missing.append(patch.pid)
+                res.missing.append(patch.pid)
             continue
-        block = patch.text.rstrip("\n").split("\n")
         if patch.where == "after":
             insert_at = idx + 1
             pad = [] if len(block) == 1 else [""]
             lines[insert_at:insert_at] = pad + block
         else:
             lines[idx:idx] = block + [""]
-        applied.append(patch.pid)
-    return "\n".join(lines), applied, missing
+        res.inserted.append(patch.pid)
+    res.text = "\n".join(lines)
+    return res
 
 
 def rewrite_command(path: Path, body: str) -> str:
@@ -390,21 +444,29 @@ def main() -> int:
             if not patches:
                 continue
             original = path.read_text(encoding="utf-8")
-            new, applied, missing = apply_patches(original, patches)
+            res = apply_patches(original, patches)
             rel = display(path, root)
-            if missing:
+            if res.missing:
                 problems += 1
-                print(f"  ! {rel}: anchor not found for {', '.join(missing)} - apply by hand (see SETUP.md)")
-            if applied:
+                print(f"  ! {rel}: anchor not found for {', '.join(res.missing)} - apply by hand (see SETUP.md)")
+            if res.stale:
+                problems += 1
+                print(f"  ! {rel}: {', '.join(res.stale)} written by an older kit can't be refreshed in place - "
+                      f"restore stock skills (`openspec update`), then re-run this script")
+            changes = res.inserted + [f"{p} (refreshed)" for p in res.refreshed]
+            if changes:
                 if args.check:
                     problems += 1
-                    print(f"  x {rel}: overlay missing ({', '.join(applied)})")
+                    if res.inserted:
+                        print(f"  x {rel}: overlay missing ({', '.join(res.inserted)})")
+                    if res.refreshed:
+                        print(f"  x {rel}: overlay stale, from an older kit ({', '.join(res.refreshed)})")
                 elif args.dry_run:
-                    print(f"  ~ {rel}: would insert {', '.join(applied)}")
+                    print(f"  ~ {rel}: would update {', '.join(changes)}")
                 else:
-                    path.write_text(new, encoding="utf-8")
-                    print(f"  + {rel}: inserted {', '.join(applied)}")
-            elif not missing:
+                    path.write_text(res.text, encoding="utf-8")
+                    print(f"  + {rel}: updated {', '.join(changes)}")
+            elif not res.missing and not res.stale:
                 print(f"  = {rel}: up to date")
 
     # Pass 2: wrap /opsx commands. Some tools keep commands in a folder without skills
@@ -433,19 +495,22 @@ def main() -> int:
                     print(f"[{display(tdir, root)}] commands")
                     header_printed = True
                 rel = display(f, root)
-                if WRAPPER_MARK in f.read_text(encoding="utf-8"):
+                owner = next((d for d in dirs if target.is_relative_to(d)), None)
+                current = f.read_text(encoding="utf-8")
+                wrapped = rewrite_command(f, wrapper_body(skill_location(target, root, owner), skill))
+                if current == wrapped:
                     print(f"  = {rel}: wrapper up to date")
                     continue
+                stale = WRAPPER_MARK in current
                 if args.check:
                     problems += 1
-                    print(f"  x {rel}: stock command (bypasses VSDD skill)")
+                    print(f"  x {rel}: " + ("wrapper stale, from an older kit" if stale
+                                            else "stock command (bypasses VSDD skill)"))
                 elif args.dry_run:
-                    print(f"  ~ {rel}: would become wrapper -> {skill}")
+                    print(f"  ~ {rel}: would " + ("refresh wrapper" if stale else f"become wrapper -> {skill}"))
                 else:
-                    owner = next((d for d in dirs if target.is_relative_to(d)), None)
-                    body = wrapper_body(skill_location(target, root, owner), skill)
-                    f.write_text(rewrite_command(f, body), encoding="utf-8")
-                    print(f"  + {rel}: now wraps {skill}")
+                    f.write_text(wrapped, encoding="utf-8")
+                    print(f"  + {rel}: " + ("wrapper refreshed" if stale else f"now wraps {skill}"))
 
     if skills_found == 0:
         print("No OpenSpec skills found. Run `openspec init --tools <tool>` first.", file=sys.stderr)
