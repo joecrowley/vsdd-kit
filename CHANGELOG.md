@@ -10,6 +10,14 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Changed
+- `SETUP.md` Step 9: the install report tells the user to start a new agent session
+  before the first `/opsx` command. Agents load commands when a session starts, so the
+  commands the install creates aren't available in the session that ran it.
+- `docs/SETUP-REFERENCE.md` Troubleshooting: two new rows, for `/opsx` commands being
+  unknown right after an install, and for the misleading `with schema 'spec-driven'`
+  line that `openspec new change` prints before it applies `schema: visual-driven`.
+
 ## [0.3.1] - 2026-09-26
 
 ### Fixed
