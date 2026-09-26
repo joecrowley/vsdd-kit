@@ -282,6 +282,7 @@ vsdd-kit/
 ├── README.md                    ← this file
 ├── SETUP.md                     ← runbook for the AI agent
 ├── docs/WHY_VSDD.md             ← the case for adopting VSDD
+├── docs/ARCHITECTURE.md         ← for contributors: how the scripts fit together
 ├── docs/concept-report.md       ← background: the research and concept behind VSDD
 ├── tests/smoke_test.sh          ← end-to-end test
 └── files/                       ← mirrors the target project layout
