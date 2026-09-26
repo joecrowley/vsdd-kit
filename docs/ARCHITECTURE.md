@@ -33,7 +33,7 @@ flowchart TD
 
 | Script | Job | Run by |
 |---|---|---|
-| `vsdd_install.py` | Steps 0–5 of `SETUP.md` in one go, then records the kit version in `openspec/.vsdd.json`. Never makes an ASK decision: stops with exit 3 and names the flag. `--status` compares an install with the kit | The agent (fast path), or you. Runs from the kit, never copied into projects |
+| `vsdd_install.py` | Steps 0–5 of the setup (by hand: `docs/SETUP-REFERENCE.md`) in one go, then records the kit version in `openspec/.vsdd.json`. Never makes an ASK decision: stops with exit 3 and names the flag. `--status` compares an install with the kit | The agent (fast path), or you. Runs from the kit, never copied into projects |
 | `openspec_preflight.py` | Reports what `openspec update` would delete, tools to add, custom schemas, in-flight changes and shared workspace folders. `--safe-update` | The agent (manual path), the installer (imported), you before an `openspec update` |
 | `install_overlay.py` | Inserts the marked VSDD blocks into the `openspec-*` skills, refreshes single-line ones, and turns `/opsx` commands into wrappers. `--check` for CI | The installer, and you after every `openspec init` / `update` |
 | `validate_mermaid.py` | Mermaid lint, change structure (Placement, verbatim Before, ownership), decisions log. `--render` parses with mermaid-cli | The patched skills, CI, you |

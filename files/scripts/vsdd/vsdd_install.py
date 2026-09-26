@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Install or upgrade VSDD in one go: the mechanical steps of SETUP.md.
+"""Install or upgrade VSDD in one go: the mechanical steps of the kit's SETUP.md.
 
 Run it from the kit, not from the project:
 
   python3 "$KIT"/files/scripts/vsdd/vsdd_install.py --root "$ROOT" --tools claude,qwen
   python3 "$KIT"/files/scripts/vsdd/vsdd_install.py --root "$ROOT" --tools qwen --dry-run
 
-It does SETUP.md Steps 0-5 and creates the decisions log:
+It does Steps 0-5 (docs/SETUP-REFERENCE.md has each one by hand) and creates the
+decisions log:
   0  install branch (vsdd-install) and a snapshot of what git can't restore
   1  openspec init (fresh project), or add missing tools and run `openspec update`
   2  copy the schema, docs and scripts
@@ -24,7 +25,7 @@ changes nothing:
 
   python3 "$KIT"/files/scripts/vsdd/vsdd_install.py --root "$ROOT" --status
 
-It never makes a decision that SETUP.md marks ASK. When one is needed, it stops
+It never makes a decision that the runbook marks ASK. When one is needed, it stops
 BEFORE changing anything (exit 3) and names the flag that records the answer:
   uncommitted changes                 --allow-dirty
   `openspec update` would delete      --update safe  (keep them) | --update plain (accept)
@@ -33,7 +34,7 @@ BEFORE changing anything (exit 3) and names the flag that records the answer:
   a shared workspace folder with      --extra-dir <folder> (patch it: affects every project
   OpenSpec commands (VS Code/Devin)     that uses it) | --leave-shared
   a home-folder tool (e.g. MiniMax)   --extra-dir <folder>
-  hand-edited skills                  do SETUP.md Step 1b by hand, then re-run
+  hand-edited skills                  do Step 1b of docs/SETUP-REFERENCE.md by hand, then re-run
 
 --tooling-dir <folder> keeps the kit's docs and scripts out of the project: they are
 copied to that folder (e.g. a shared spec-core/vsdd in the editor workspace), and the
@@ -183,7 +184,7 @@ class Installer:
         self.schema = configured_schema(root)
         self.custom_schema = self.schema is not None and self.schema not in STOCK_SCHEMAS
         if self.custom_schema and not a.custom_schema:
-            stops.append(f"the project uses a custom schema '{self.schema}'. Options (SETUP.md Step 3): "
+            stops.append(f"the project uses a custom schema '{self.schema}'. Options (Step 3 of docs/SETUP-REFERENCE.md): "
                          "--custom-schema switch (use visual-driven), or --custom-schema keep (you add "
                          "the diagrams artifact to their schema by hand), or stop")
         self.shared_notes = []
@@ -227,7 +228,7 @@ class Installer:
         hand = self.hand_edited_skills()
         if hand:
             stops.append("these skills mention diagrams but have no VSDD markers, so they were probably "
-                         f"hand-edited: {', '.join(hand)}. Do SETUP.md Step 1b by hand, then re-run")
+                         f"hand-edited: {', '.join(hand)}. Do Step 1b of the kit's docs/SETUP-REFERENCE.md by hand, then re-run")
         if stops:
             raise Stop("\n".join(f"- {s}" for s in stops))
 
@@ -571,7 +572,7 @@ class Installer:
         check = run(cmd + ["--check"], self.root, check=False)
         if check.returncode != 0:
             raise Failed("overlay incomplete. If it says `anchor not found`, the stock skill text changed: "
-                         "follow SETUP.md Step 5 to insert those blocks by hand.\n"
+                         "follow Step 5 of the kit's docs/SETUP-REFERENCE.md to insert those blocks by hand.\n"
                          + (apply.stdout + apply.stderr + check.stdout + check.stderr).strip()[-2000:])
         changed = sum(1 for l in apply.stdout.splitlines() if l.lstrip().startswith("+"))
         self.done.append(f"5 overlay: {changed} file change(s); check OK")
@@ -827,7 +828,7 @@ def main() -> int:
         print("Left for you (the agent), in order:")
         print("\n".join(f"  - {t}" for t in inst.todo))
     if status == 1 and inst.done:
-        print("Steps above 'A step failed' completed. Continue from the failed step using SETUP.md.",
+        print("Steps above 'A step failed' completed. Continue from the failed step using the kit's docs/SETUP-REFERENCE.md.",
               file=sys.stderr)
     return status
 
