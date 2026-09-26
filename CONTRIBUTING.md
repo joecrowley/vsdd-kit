@@ -69,7 +69,8 @@ Installs record `VERSION` in `openspec/.vsdd.json`, and a project's CI fetches t
 1. Move the `[Unreleased]` entries in `CHANGELOG.md` to a new version heading, with
    the date, and update the compare links at the bottom.
 2. Set `VERSION`, following semver: a patch for fixes, a minor version for new
-   features, a major version for changes that need users to act.
+   features, a major version for changes that need users to act. Update the pinned
+   install commands to the new tag: `grep -rn "vsdd-kit@v" --exclude=CHANGELOG.md .`
 3. Merge, then tag the merge commit `v<VERSION>` (annotated) and push the tag.
 4. Check the release from a clean machine:
    `uvx --from git+https://github.com/joecrowley/vsdd-kit@v<VERSION> vsdd-kit --version`.
