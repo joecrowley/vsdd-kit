@@ -232,8 +232,14 @@ Reply with:
 - Needs your attention: <anything skipped, failed, or deferred>
 - To undo the whole install: see "Roll back an install" in docs/SETUP-REFERENCE.md in the kit
 
-Next: try `/opsx:propose <small change with a visual impact>` and review its diagrams.md.
+Next: start a new agent session, then try `/opsx:propose <small change with a visual impact>`
+and review its diagrams.md.
 ```
+
+Most agents load slash commands and skills only when a session starts, so the
+`/opsx` commands the install created aren't available in the session that ran it.
+Say so in the report: the user needs a new session (or a reload of the tool) before
+the first `/opsx` command.
 
 Then suggest the user commit everything on the install branch as a single commit,
 for example `chore: install visual spec-driven development (VSDD)`, review it, and

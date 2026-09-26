@@ -409,6 +409,8 @@ Pass the folder to `vsdd_snapshot.py save --extra-dir` too, so a rollback covers
 |---|---|---|
 | `openspec instructions diagrams` shows no `<rules>` | `config.yaml` uses `prompts:` or has a YAML indentation error | Use `rules:`. Check with `python3 -c "import yaml;print(yaml.safe_load(open('openspec/config.yaml')))"` |
 | Change created without `diagrams.md` | Change made with a different schema | `cat openspec/changes/<name>/.openspec.yaml` should show `schema: visual-driven`. Check `schema:` in `config.yaml` |
+| `/opsx:propose` (or another `/opsx` command) is unknown right after the install | The agent loaded its commands and skills when the session started, before the install created them | Start a new session, or reload the tool. The commands are in the tool's folder (for Claude Code, `.claude/commands/opsx/`) |
+| `openspec new change` prints `with schema 'spec-driven'`, then `Schema: visual-driven` | The first line is the CLI's built-in default, printed before it reads `config.yaml` | Nothing to fix if `openspec/changes/<name>/.openspec.yaml` shows `schema: visual-driven` |
 | Archive summary has no `Diagrams:` line | Stock command or skill used (overlay wiped) | `install_overlay.py --check`, then re-apply |
 | Archive reports "Diagrams: no-op" on a YES gate | After State uses `##` instead of `### <Stable Name>`, or there's no `## Placement` table | Fix the headings or add the table, then merge by hand. The validator flags both |
 | Validator: "Before ... is not a verbatim copy" | The Before section was edited, or the Source of Truth changed after the change was proposed | Re-copy the section from the file the Placement row names. If the Source of Truth really changed, re-check that the After State still applies |
