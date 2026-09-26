@@ -146,7 +146,11 @@ lessons:
   read the log and follow every rule that applies. To break one deliberately, write
   `Overrides: <Stable Name> - <why>` under Decisions in `design.md`.
 - **Archive:** if the change fixed a bug caused by a pattern that could recur, or set
-  a convention, the agent drafts an entry and **asks** before adding it. If the
+  a convention, the agent drafts an entry and **asks** before adding it. A change
+  that deliberately does something differently from existing code doing the same
+  kind of thing (say, it refreshes in place after a write while another write still
+  reloads) sets a convention too, and the entry's **Applies to:** names the code
+  that doesn't follow it yet. If the
   design overrode a rule, it asks whether to update or retire that entry. The archive
   summary has a **Decisions** line.
 - **Pitfalls in context:** copy the one to three costliest rules, one line each, into

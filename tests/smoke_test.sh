@@ -104,6 +104,8 @@ grep -q "wrapper stale" <<<"$(python3 scripts/vsdd/install_overlay.py --check 2>
   && grep -q "follow it exactly" "$W" && pass "stale command wrapper detected and refreshed" || fail "stale wrapper not refreshed"
 grep -q "vsdd:archive-decisions" .*/skills/openspec-archive-change/SKILL.md && grep -q "vsdd:gen-decisions" .*/skills/openspec-propose/SKILL.md \
   && pass "decisions steps patched into propose and archive" || fail "decisions steps missing"
+grep -q "deliberately does" .*/skills/openspec-archive-change/SKILL.md && grep -q "deliberately does" openspec/config.yaml \
+  && pass "archive decisions step covers a change that diverges from existing code" || fail "archive decisions step misses divergence"
 for s in propose apply-change verify-change archive-change continue-change ff-change update-change bulk-archive-change; do
   for f in .*/skills/openspec-$s/SKILL.md; do
     [ -e "$f" ] || continue

@@ -11,6 +11,18 @@ command that `status` prints.
 ## [Unreleased]
 
 ### Changed
+- The archive's decisions step now also asks whether the change deliberately does
+  something differently from existing code that does the same kind of thing. For
+  example, a new write that refreshes in place while an existing write still reloads
+  through a loading state. That difference is drafted as a decision, whose
+  **Applies to:** names the code that doesn't follow it yet. Before, an archive could
+  report "Decisions: none" for a change that left two writes behaving differently.
+  A `none` now comes with a one-line reason. Existing installs get the new wording
+  when the overlay is re-applied (re-run the installer, or `install_overlay.py`). The
+  matching `operations.archive.guidance` line in `config.yaml` is only written on new
+  installs: copy it from `files/openspec/config.yaml.example` to update an existing one.
+
+### Changed
 - `SETUP.md` Step 9: the install report tells the user to start a new agent session
   before the first `/opsx` command. Agents load commands when a session starts, so the
   commands the install creates aren't available in the session that ran it.
