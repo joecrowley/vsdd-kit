@@ -1,17 +1,53 @@
 # VSDD Kit — Visual Spec-Driven Development for OpenSpec
 
-**Architecture diagrams that stay true to the code.** VSDD extends
-[OpenSpec](https://github.com/Fission-AI/OpenSpec) so that every change records a
-**Before/After Mermaid diagram**, has it checked against the code, and on archive
-**merges it into a canonical diagram Source of Truth**. Diagrams get the same delta
-discipline as specs.
+**Your architecture diagrams are wrong the day after you draw them.** VSDD has your AI
+coding agent redraw them in the same change as the code, checks them against the code
+before the change counts as done, and merges them into one set of diagrams that stays
+current. It extends [OpenSpec](https://github.com/Fission-AI/OpenSpec), and installs
+into all 40 AI tools OpenSpec supports: Claude Code, Cursor, Codex, GitHub Copilot and
+the rest.
 
-**Why bother?** See [The Case for VSDD](docs/WHY_VSDD.md): the problem, the benefits,
-the costs, objections, and how to tell whether it's working.
+### What it caught
 
-The kit is designed to be **installed by your AI coding agent**. Point Claude Code,
-OpenCode, Qwen Code, Codex, Cursor or similar at [`SETUP.md`](SETUP.md), and it
-installs, configures, seeds and verifies everything.
+In the [worked example](examples/book-notes), an agent added private notes to a
+Flutter reading-list app. The proposal's diagrams covered the new notes flow. During
+the build, a reviewer asked for one shared `patchBook` API call instead of a new
+`patchNotes`. Before the change could count as done, VSDD traced every arrow in its
+diagrams to the code, and found that the change had also rewired a flow nobody had
+mentioned:
+
+```diff
+ ## Status Update Flow        (not in the proposal: found by the check)
+-    R->>A: patchStatus(id, status)
++    R->>A: patchBook(id, status: name)
+```
+
+The diagram was corrected, the reason recorded, and the archive merged it into the
+project's diagrams. Without the check, those diagrams would still show a call that
+no longer exists.
+
+### Is this for you?
+
+- **Yes**, if AI agents write much of your code, and its structure matters: layers,
+  flows, state machines, services. VSDD builds on OpenSpec, so you'll be using (or
+  adopting) its spec-driven changes.
+- **Probably not** for prototypes, tiny codebases one person holds in their head, or
+  work that is mostly content and styling.
+- **The cost:** a few minutes of diagram review on each change that alters structure.
+  Most changes don't, and say so in one line.
+  [The case for VSDD](docs/WHY_VSDD.md) covers the benefits, the costs and the
+  objections honestly.
+
+### Try it
+
+```bash
+npm install -g @fission-ai/openspec
+uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit guide
+```
+
+`guide` prints the runbook. Ask your agent to follow it: it installs, configures,
+seeds diagrams from your code and verifies everything, and asks you only about
+decisions that are yours. Details in [Quick start](#quick-start).
 
 ---
 
