@@ -411,6 +411,39 @@ HOME="$IH" python3 "$INST" --root . --tools none --extra-dir ../shared --tooling
   && pass "--tooling-dir <kit>/files: used in place, config repointed from the old tooling folder" || fail "--tooling-dir kit in place"
 cd "$ROOT"
 
+step "Package (vsdd-kit entry point)"
+if command -v uv >/dev/null; then
+  PK="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-pkg.XXXXXX")"
+  [ -z "${KEEP:-}" ] && trap 'rm -rf "$ROOT" "$XDG" "$ROOT2" "$XFULL" "$XLESS" "$ROOT3" "$XR" "$(dirname "$SNAP")" "$ROOT4" "$FH" "$ROOT5" "$IH" "$WS" "$PK"' EXIT
+  export UV_CACHE_DIR="${UV_CACHE_DIR:-$(uv cache dir)}"   # keep uv's cache when HOME is sandboxed below
+  (cd "$KIT" && uv build -q --wheel --out-dir "$PK/dist" >/dev/null 2>&1) || fail "uv build"
+  WHL="$(ls "$PK"/dist/*.whl)"
+  python3 -c "import zipfile,sys; sys.exit(any('__pycache__' in n for n in zipfile.ZipFile(sys.argv[1]).namelist()))" "$WHL" \
+    && pass "wheel built, without caches" || fail "wheel contains __pycache__"
+  VK() { uvx -q --from "$WHL" vsdd-kit "$@"; }
+  [ "$(VK --version)" = "vsdd-kit $(cat "$KIT/VERSION")" ] && pass "vsdd-kit --version matches VERSION" || fail "vsdd-kit --version"
+  KP="$(VK path)"
+  [ -f "$KP/SETUP.md" ] && [ -f "$KP/docs/SETUP-REFERENCE.md" ] && [ -f "$KP/files/openspec/config.yaml.example" ] \
+    && pass "vsdd-kit path is a complete kit (usable as KIT in SETUP.md)" || fail "packaged kit incomplete"
+  G1="$(VK guide)"; G2="$(VK guide --reference)"
+  [ "$(head -1 <<<"$G1")" = "# VSDD Setup Runbook (for AI coding agents)" ] && [ "$(head -1 <<<"$G2")" = "# VSDD Setup Reference" ] \
+    && pass "vsdd-kit guide prints SETUP.md and the reference" || fail "vsdd-kit guide"
+  mkdir -p "$PK/app"; cd "$PK/app"; git init -q; echo "# app" > README.md; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base
+  rc=0; HOME="$IH" VK install --root /nonexistent --tools claude >/dev/null 2>&1 || rc=$?
+  [ "$rc" = 2 ] && pass "a missing prerequisite exits 2 through the entry point" || fail "prerequisite exit: $rc"
+  HOME="$IH" VK install --root . --tools claude >/dev/null 2>&1 && python3 scripts/vsdd/install_overlay.py --check >/dev/null \
+    && pass "vsdd-kit install: a full install from the wheel" || fail "vsdd-kit install"
+  python3 -c "import json,sys; d=json.load(open('openspec/.vsdd.json')); sys.exit(not (d['kit_version'] and d['kit_commit'] is None))" \
+    && pass "packaged install records the version, and no commit (not a clone)" || fail "packaged install stamp"
+  VK status --root . >/dev/null && pass "vsdd-kit status: up to date" || fail "vsdd-kit status"
+  echo "# local edit" >> scripts/vsdd/merge_diagrams.py
+  OUT="$(VK status --root . || true)"
+  grep -q "vsdd-kit install --root" <<<"$OUT" && pass "vsdd-kit status prints a vsdd-kit upgrade command" || fail "status upgrade command"
+  cd "$ROOT"
+else
+  echo "  skip  uv not installed"
+fi
+
 printf '\n\033[32mAll checks passed.\033[0m\n'
 [ -n "${KEEP:-}" ] && echo "Project kept at $ROOT"
 exit 0

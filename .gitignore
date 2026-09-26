@@ -2,3 +2,7 @@
 __pycache__/
 *.pyc
 /tmp/
+/dist/
+/build/
+*.egg-info/
+.venv/
