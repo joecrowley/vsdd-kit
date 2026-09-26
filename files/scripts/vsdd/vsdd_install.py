@@ -60,6 +60,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -127,6 +128,12 @@ def kit_commit() -> str | None:
         return None
     proc = run(["git", "describe", "--tags", "--always", "--dirty"], kit, check=False)
     return proc.stdout.strip() or None if proc.returncode == 0 else None
+
+
+def branch_created_at(root: Path, branch: str) -> float | None:
+    """When the branch was created (its oldest reflog entry), or None if git doesn't know."""
+    out = run(["git", "reflog", "show", "--format=%ct", f"refs/heads/{branch}"], root, check=False).stdout.split()
+    return float(out[-1]) if out else None
 
 
 def installer_command() -> str:
@@ -309,6 +316,7 @@ class Installer:
                 self.plan.append(f"0 create branch {name} (from {current or 'HEAD'})")
                 if not self.args.dry_run:
                     run(["git", "switch", "-c", name], self.root)
+                    self.created_branch = True
                     self.done.append(f"0 branch: created {name} from {current or 'HEAD'}")
         reuse = self.install_snapshot()
         if reuse:
@@ -330,19 +338,27 @@ class Installer:
 
         A new snapshot would capture a half-installed state, and rolling back to it would
         keep the install. The earliest snapshot taken on this branch is the pre-install one.
+        A branch this run just created has none yet, and a snapshot older than the branch
+        belongs to an earlier install branch of the same name (deleted since): neither is
+        reused, or a rollback would restore the wrong moment.
         """
-        if not self.is_git:
+        if not self.is_git or getattr(self, "created_branch", False):
             return None
         current = run(["git", "branch", "--show-current"], self.root).stdout.strip()
         if not current.startswith("vsdd-install"):
             return None
+        since = branch_created_at(self.root, current)
         for snap in sorted((Path.home() / ".vsdd-snapshots").glob(f"{self.root.name}-*")):
             try:
                 m = json.loads((snap / "manifest.json").read_text(encoding="utf-8"))
+                taken = time.mktime(time.strptime(m.get("created", ""), "%Y%m%d-%H%M%S"))
             except (OSError, ValueError):
                 continue
-            if m.get("root") == str(self.root) and (m.get("git") or {}).get("branch") == current:
-                return snap
+            if m.get("root") != str(self.root) or (m.get("git") or {}).get("branch") != current:
+                continue
+            if since is not None and taken < since - 1:  # snapshot names have 1-second resolution
+                continue
+            return snap
         return None
 
     def step1_openspec(self) -> None:
