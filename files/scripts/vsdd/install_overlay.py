@@ -155,6 +155,12 @@ ARCHIVE_DECISIONS = """\
    Ask: does this change teach a rule that other changes must follow? Typical cases:
    a bug fix whose cause is a pattern that could recur elsewhere (for example a
    loading state emitted after a write), or a new convention set in design.md.
+   Also compare the change with existing code that does the same kind of thing
+   (another write, screen or repository method). If the change deliberately does
+   it differently, for example it refreshes in place after a write while an existing
+   write still reloads through a loading state, that difference is a convention even
+   if design.md doesn't call it one: draft it, and name the code that doesn't follow
+   it yet under **Applies to:**.
    - If yes: draft an entry for `openspec/specs/architecture/decisions.md`
      (create the file with a `# Architecture Decisions` header if needed):
      `## <Stable Name>`, then **Rule:**, **Why:**, **Applies to:** and
@@ -163,7 +169,7 @@ ARCHIVE_DECISIONS = """\
    - If the change's design.md has `Overrides: <Stable Name>`, ask whether that
      entry should be updated or retired.
    - Otherwise do nothing. Include a `**Decisions:**` line in the final summary
-     (added, updated, retired, or none).
+     (added, updated, retired, or none, with a one-line reason).
 """
 
 ARCHIVE_GUARDRAIL = """\
