@@ -27,7 +27,7 @@ there.
 
 | Name | Meaning |
 |---|---|
-| `KIT` | The directory containing this `SETUP.md`. Its files are under `KIT/files/`. If you are running the kit as a package (`vsdd-kit guide` printed this runbook), `KIT` is what `vsdd-kit path` prints, and every command below works with it. |
+| `KIT` | The directory containing this `SETUP.md`. Its files are under `KIT/files/`. If you printed this runbook with `uvx --from <source> vsdd-kit guide`, run the same command with `path` in place of `guide`: `KIT` is the folder it prints, and every command below works with it. `uvx` installs nothing, so there is no `vsdd-kit` command on your PATH: always run it as `uvx --from <source> vsdd-kit ...`. |
 | `ROOT` | The target project's root, where the setup is installed. Run commands from `ROOT`. |
 | `TOOLS` | The AI tools the team uses, as OpenSpec tool ids: `claude`, `opencode`, `qwen`, `cursor`, `codex`, `github-copilot`, `windsurf`, `gemini`, ... (full list: `openspec init --help`). |
 
@@ -161,7 +161,12 @@ python3 scripts/vsdd/validate_mermaid.py --render   # if mmdc is installed
 **ASK** whether to add CI. If the project uses GitHub Actions (`ROOT/.github/`
 exists) and the user agrees, copy `KIT/files/ci/github/vsdd.yml` to
 `ROOT/.github/workflows/vsdd.yml`. It lints and renders diagrams, and fails if an
-`openspec update` has wiped the overlay.
+`openspec update` has wiped the overlay. It works with either kind of install: it
+uses the project's `scripts/vsdd/` when they exist. After an install with
+`--tooling-dir`, it runs the kit release recorded in `openspec/.vsdd.json` with
+`uvx` instead, which needs the kit repository to be readable from CI. Tell the user
+that. If the skills live in a shared workspace folder, the overlay check is skipped,
+because CI can't see that folder.
 
 For other CI systems, add a job that runs:
 
@@ -169,6 +174,8 @@ For other CI systems, add a job that runs:
 npm install -g @mermaid-js/mermaid-cli
 python3 scripts/vsdd/validate_mermaid.py --render
 python3 scripts/vsdd/install_overlay.py --check
+# after --tooling-dir: uvx --from git+https://github.com/joecrowley/vsdd-kit@v<kit_version> vsdd-kit validate --root . --render
+#                      (and `vsdd-kit overlay --root . --check`, if the repository has its own skills)
 ```
 
 **Verify:** the workflow file is valid YAML
