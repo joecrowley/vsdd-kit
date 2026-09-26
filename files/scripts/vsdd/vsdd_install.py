@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -118,9 +119,20 @@ def version_tuple(text: str) -> tuple[int, ...]:
 
 
 def kit_commit() -> str | None:
-    """The kit clone's commit (tag-relative, `-dirty` if edited), or None outside git."""
-    proc = run(["git", "describe", "--tags", "--always", "--dirty"], KIT_FILES.parent, check=False)
+    """The kit clone's commit (tag-relative, `-dirty` if edited). None when the kit isn't
+    a clone (e.g. installed as a package), even if it sits inside some other repository."""
+    kit = KIT_FILES.parent
+    top = run(["git", "rev-parse", "--show-toplevel"], kit, check=False)
+    if top.returncode != 0 or Path(top.stdout.strip()).resolve() != kit.resolve():
+        return None
+    proc = run(["git", "describe", "--tags", "--always", "--dirty"], kit, check=False)
     return proc.stdout.strip() or None if proc.returncode == 0 else None
+
+
+def installer_command() -> str:
+    """How to run this installer again: the `vsdd-kit` entry point when it started us."""
+    cli = os.environ.get("VSDD_KIT_CLI")
+    return f"{cli} install" if cli else f"python3 {HERE / 'vsdd_install.py'}"
 
 
 class Installer:
@@ -746,7 +758,7 @@ def show_status(args: argparse.Namespace) -> int:
             f"      {l.strip()}" for l in check.stdout.splitlines() if l.lstrip().startswith(("x", "!"))))
 
     tools = ",".join(stamp.get("tools") or []) or "<TOOLS>"
-    upgrade = [f"python3 {HERE / 'vsdd_install.py'}", f"--root {root}", f"--tools {tools}"]
+    upgrade = [installer_command(), f"--root {root}", f"--tools {tools}"]
     upgrade += [f"--extra-dir {d}" for d in extra]
     if stamp.get("tooling_dir") and tooling is not None:
         upgrade.append(f"--tooling-dir {tooling}")
@@ -810,7 +822,11 @@ def main() -> int:
         status, message = 3, f"Stopped before changing anything - decisions needed:\n{e}"
     except Failed as e:
         status, message = 1, f"A step failed: {e}"
-    result = {"status": {0: "ok", 1: "failed", 3: "needs-decision"}[status],
+    except SystemExit as e:
+        if not isinstance(e.code, str):
+            raise
+        status, message = 2, e.code  # bad invocation or missing prerequisite: nothing was changed
+    result = {"status": {0: "ok", 1: "failed", 2: "prerequisite", 3: "needs-decision"}[status],
               "openspec_version": getattr(inst, "version", None), "dry_run": args.dry_run,
               "plan": inst.plan, "done": inst.done, "todo": inst.todo, "message": message}
     if args.json:

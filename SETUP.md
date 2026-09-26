@@ -27,7 +27,7 @@ there.
 
 | Name | Meaning |
 |---|---|
-| `KIT` | The directory containing this `SETUP.md`. Its files are under `KIT/files/`. |
+| `KIT` | The directory containing this `SETUP.md`. Its files are under `KIT/files/`. If you are running the kit as a package (`vsdd-kit guide` printed this runbook), `KIT` is what `vsdd-kit path` prints, and every command below works with it. |
 | `ROOT` | The target project's root, where the setup is installed. Run commands from `ROOT`. |
 | `TOOLS` | The AI tools the team uses, as OpenSpec tool ids: `claude`, `opencode`, `qwen`, `cursor`, `codex`, `github-copilot`, `windsurf`, `gemini`, ... (full list: `openspec init --help`). |
 

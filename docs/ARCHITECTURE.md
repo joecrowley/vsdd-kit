@@ -13,6 +13,8 @@ are imports of shared code.
 ```mermaid
 flowchart TD
     AGENT["AI agent following SETUP.md"] -->|"fast path"| INST["vsdd_install.py - Steps 0-5"]
+    AGENT -->|"packaged: uvx vsdd-kit install"| PKG["vsdd_kit/cli.py - vsdd-kit command"]
+    PKG -->|"runs by name"| INST
     AGENT -->|"manual path, Step 0"| PRE["openspec_preflight.py"]
     INST -.->|"imports: checks, safe update"| PRE
     INST -.->|"imports: patch list"| OVL["install_overlay.py"]
@@ -38,6 +40,7 @@ flowchart TD
 | `install_overlay.py` | Inserts the marked VSDD blocks into the `openspec-*` skills, refreshes single-line ones, and turns `/opsx` commands into wrappers. `--check` for CI | The installer, and you after every `openspec init` / `update` |
 | `validate_mermaid.py` | Mermaid lint, change structure (Placement, verbatim Before, ownership), decisions log. `--render` parses with mermaid-cli | The patched skills, CI, you |
 | `merge_diagrams.py` | The archive merge: applies Placement rows (remove, move, update, add), refuses if the Source of Truth changed | The patched archive skill |
+| `vsdd_kit/cli.py` | The `vsdd-kit` command when the kit is installed as a package: runs the scripts above by name (`install`, `status`, ...), prints the guides, and `path` names the kit folder inside the package. The wheel holds the kit in the repository's layout (`pyproject.toml`) | You, or the agent, via `uvx` / `pipx` |
 | `vsdd_snapshot.py` | Saves and restores what git can't: untracked install files and the global OpenSpec config | The installer (save), you (restore) |
 
 ## Where the pieces end up

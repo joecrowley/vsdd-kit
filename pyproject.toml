@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vsdd-kit"
+dynamic = ["version"]
+description = "Visual Spec-Driven Development for OpenSpec: Before/After Mermaid diagrams that stay true to the code"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+dependencies = []   # standard library only; the OpenSpec CLI (npm) is a prerequisite, checked at run time
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Environment :: Console",
+    "Topic :: Software Development :: Documentation",
+]
+
+[project.urls]
+Homepage = "https://github.com/joecrowley/vsdd-kit"
+
+[project.scripts]
+vsdd-kit = "vsdd_kit.cli:main"
+
+[tool.hatch.version]
+path = "VERSION"
+pattern = "(?P<version>[^\\s]+)"
+
+# The wheel holds the kit laid out as in this repository, inside the package, so
+# `vsdd-kit path` can stand in for a clone (KIT in SETUP.md).
+[tool.hatch.build.targets.wheel]
+packages = ["vsdd_kit"]
+exclude = ["**/__pycache__", "**/*.pyc", "**/.DS_Store"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"files" = "vsdd_kit/files"
+"SETUP.md" = "vsdd_kit/SETUP.md"
+"docs/SETUP-REFERENCE.md" = "vsdd_kit/docs/SETUP-REFERENCE.md"
+"VERSION" = "vsdd_kit/VERSION"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["**/__pycache__", "**/*.pyc", "**/.DS_Store", "/.github"]

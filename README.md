@@ -99,10 +99,24 @@ for render checks.
 
 ```bash
 npm install -g @fission-ai/openspec
-git clone <this-repo> ~/vsdd-kit
 ```
 
 Then open your project in your AI coding tool and say:
+
+> Install VSDD into this project: run
+> `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit guide`
+> and follow the runbook it prints. Use `vsdd-kit path` as `KIT`.
+
+This needs [uv](https://docs.astral.sh/uv/). `uvx` runs the kit from that release
+tag without cloning it or installing anything for good. `pipx run --spec
+git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit ...` works too.
+
+**Or clone it**, which you need for the kit-in-your-workspace setup
+(`--tooling-dir`, below) and for working on the kit:
+
+```bash
+git clone https://github.com/joecrowley/vsdd-kit ~/vsdd-kit
+```
 
 > Follow `~/vsdd-kit/SETUP.md` to install VSDD into this project.
 
@@ -119,8 +133,17 @@ decision is yours, and changes nothing until you've answered. You can also run i
 yourself:
 
 ```bash
-python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --tools claude --dry-run
+uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.2.0 vsdd-kit install --root . --tools claude --dry-run
+python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --tools claude --dry-run   # from a clone
 ```
+
+| `vsdd-kit` command | Same as |
+|---|---|
+| `install` | `files/scripts/vsdd/vsdd_install.py` |
+| `status` | `vsdd_install.py --status`: is a project's install behind this kit? |
+| `preflight`, `snapshot` | `openspec_preflight.py`, `vsdd_snapshot.py` |
+| `guide` (`--reference`) | prints `SETUP.md` (`docs/SETUP-REFERENCE.md`) |
+| `path` | the kit folder inside the package: use it as `KIT` |
 
 | Step | What happens |
 |---|---|
@@ -154,7 +177,7 @@ python3 scripts/vsdd/validate_mermaid.py --render   # also render with mermaid-c
 python3 scripts/vsdd/merge_diagrams.py openspec/changes/<name> --dry-run   # preview the archive merge
 python3 scripts/vsdd/install_overlay.py             # re-apply after `openspec update`
 python3 scripts/vsdd/install_overlay.py --check     # CI: fail if the overlay was wiped or is stale
-python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --status   # is this install behind the kit?
+uvx --from git+https://github.com/joecrowley/vsdd-kit vsdd-kit status --root .   # is this install behind the latest kit?
 ```
 
 ## What gets installed
@@ -288,6 +311,7 @@ vsdd-kit/
 ├── SETUP.md                     ← runbook for the AI agent: the installer, then the judgement steps
 ├── docs/SETUP-REFERENCE.md      ← Steps 0–5 by hand, workspaces, maintenance, troubleshooting, rollback
 ├── VERSION                      ← kit version, recorded in each install's openspec/.vsdd.json
+├── pyproject.toml, vsdd_kit/    ← the `vsdd-kit` command: the kit as a package (uvx, pipx)
 ├── .github/workflows/smoke.yml  ← the kit's own CI: smoke test, weekly against the latest OpenSpec
 ├── docs/WHY_VSDD.md             ← the case for adopting VSDD
 ├── docs/ARCHITECTURE.md         ← for contributors: how the scripts fit together

@@ -30,6 +30,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
+      - uses: astral-sh/setup-uv@v5   # for the package checks (uv build, uvx vsdd-kit)
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
