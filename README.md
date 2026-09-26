@@ -112,7 +112,8 @@ Then open your project in your AI coding tool and say:
 
 > Install VSDD into this project: run
 > `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.0 vsdd-kit guide`
-> and follow the runbook it prints. Use `vsdd-kit path` as `KIT`.
+> and follow the runbook it prints. `KIT` is the folder printed by
+> `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.0 vsdd-kit path`.
 
 This needs [uv](https://docs.astral.sh/uv/). `uvx` runs the kit from that release
 tag without cloning it or installing anything for good. `pipx run --spec
