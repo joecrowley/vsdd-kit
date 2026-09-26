@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-27
+
 ### Changed
 - The archive's decisions step now also asks whether the change deliberately does
   something differently from existing code that does the same kind of thing. For
@@ -21,8 +23,6 @@ command that `status` prints.
   when the overlay is re-applied (re-run the installer, or `install_overlay.py`). The
   matching `operations.archive.guidance` line in `config.yaml` is only written on new
   installs: copy it from `files/openspec/config.yaml.example` to update an existing one.
-
-### Changed
 - `SETUP.md` Step 9: the install report tells the user to start a new agent session
   before the first `/opsx` command. Agents load commands when a session starts, so the
   commands the install creates aren't available in the session that ran it.
@@ -123,7 +123,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/joecrowley/vsdd-kit/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/joecrowley/vsdd-kit/compare/v0.1.0...v0.2.0
