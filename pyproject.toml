@@ -37,6 +37,7 @@ exclude = ["**/__pycache__", "**/*.pyc", "**/.DS_Store"]
 "SETUP.md" = "vsdd_kit/SETUP.md"
 "docs/SETUP-REFERENCE.md" = "vsdd_kit/docs/SETUP-REFERENCE.md"
 "VERSION" = "vsdd_kit/VERSION"
+"THIRD_PARTY_NOTICES.md" = "vsdd_kit/THIRD_PARTY_NOTICES.md"
 
 [tool.hatch.build.targets.sdist]
 exclude = ["**/__pycache__", "**/*.pyc", "**/.DS_Store", "/.github"]

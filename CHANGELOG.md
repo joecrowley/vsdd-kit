@@ -10,6 +10,18 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Added
+- `THIRD_PARTY_NOTICES.md`: the kit's `visual-driven` schema and templates are adapted
+  from OpenSpec's `spec-driven` schema (MIT, © 2024 OpenSpec Contributors). The notice
+  names what was adapted and includes OpenSpec's license. The wheel ships it, and
+  `schema.yaml` now starts with a short notice, so each project's installed copy
+  credits OpenSpec too.
+
+### Changed
+- `docs/concept-report.md` starts with a note: it's the pre-kit background research,
+  kept as it was. Its claims aren't linked to individual sources, so check them before
+  quoting.
+
 ## [0.3.2] - 2026-09-27
 
 ### Changed
