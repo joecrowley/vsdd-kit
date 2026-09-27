@@ -10,6 +10,14 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-09-27
+
+### Fixed
+- `SETUP.md` Step 9: the install report's next step always said `/opsx:propose`, the
+  Claude Code form. OpenCode and Qwen name the command `/opsx-propose`, so their users
+  were given a command that doesn't exist. The report now uses the installed tools'
+  form.
+
 ### Added
 - `THIRD_PARTY_NOTICES.md`: the kit's `visual-driven` schema and templates are adapted
   from OpenSpec's `spec-driven` schema (MIT, © 2024 OpenSpec Contributors). The notice
@@ -135,7 +143,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/joecrowley/vsdd-kit/compare/v0.2.0...v0.3.0
