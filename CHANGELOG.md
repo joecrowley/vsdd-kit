@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-09-27
+
 ### Fixed
 - The validator failed on a change that had just been merged but not yet moved to the
   archive: its Before copies no longer match the Source of Truth, by design. The
@@ -173,7 +175,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.4...HEAD
+[0.3.4]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.0...v0.3.1
