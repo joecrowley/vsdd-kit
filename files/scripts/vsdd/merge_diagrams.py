@@ -32,7 +32,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from validate_mermaid import (  # noqa: E402
     GATE_RE,
     _parse_placement,
+    _section_body,
     _sections,
+    already_merged,
     check_change_structure,
 )
 
@@ -86,38 +88,6 @@ def _put(text: str, name: str, body: str) -> tuple[str, str]:
     return _normalise(text.rstrip("\n") + "\n\n" + "\n".join(block)), "appended"
 
 
-def _section_body(root: Path, rel: str, name: str) -> str | None:
-    path = root / "openspec" / rel
-    if not path.is_file():
-        return None
-    for n, _, body in _sections(path.read_text(encoding="utf-8").splitlines(), "##"):
-        if n == name:
-            return body
-    return None
-
-
-def _already_merged(lines: list[str], h2: dict, root: Path) -> bool:
-    """True when every Placement row is already reflected in the Source of Truth."""
-    if "Placement" not in h2 or "After State" not in h2:
-        return False
-    rows, errs = _parse_placement(h2["Placement"][1])
-    if errs or not rows:
-        return False
-    after_line = h2["After State"][0]
-    next_h2 = min((ln for ln, _ in h2.values() if ln > after_line), default=len(lines) + 1)
-    after = {n: body for n, ln, body in _sections(lines, "###") if after_line < ln < next_h2}
-    for name, target, action, move_from in rows:
-        if action == "remove":
-            if _section_body(root, target, name) is not None:
-                return False
-            continue
-        if name not in after or _section_body(root, target, name) != after[name]:
-            return False
-        if action == "move" and _section_body(root, move_from, name) is not None:
-            return False
-    return True
-
-
 def _title_for(path: Path) -> str:
     return path.parent.name.replace("-", " ").replace("_", " ").title()
 
@@ -144,7 +114,7 @@ def main() -> int:
         return 0
 
     errors = check_change_structure(diagrams, lines, root, verify_before=True)
-    if errors and _already_merged(lines, h2, root):
+    if errors and already_merged(lines, root):
         print("Diagrams: already merged (Source of Truth matches the After State) - nothing to do")
         return 0
     if errors:

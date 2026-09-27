@@ -17,7 +17,8 @@ Structure checks (active change diagrams.md files):
   - every Placement row (update / add / move from <file> / remove) matches the
     Before and After `### <Stable Name>` sections, and vice versa
   - Before sections are verbatim copies of the Source of Truth file the row names
-    (checked for active changes only - archived ones describe an older state)
+    (checked for active changes only - archived ones describe an older state - and
+    skipped for a change that is already merged but not yet moved to the archive)
   - a row that adds or moves a diagram INTO specs/architecture/diagrams.md has a
     4th column, `Why here`, saying why it spans capabilities
 
@@ -248,6 +249,41 @@ def check_change_structure(path: Path, lines: list[str], root: Path, verify_befo
     return errors
 
 
+def _section_body(root: Path, rel: str, name: str) -> str | None:
+    """Body of `## name` in openspec/<rel>, or None if the file or section is missing."""
+    path = root / "openspec" / rel
+    if not path.is_file():
+        return None
+    for n, _, body in _sections(path.read_text(encoding="utf-8").splitlines(), "##"):
+        if n == name:
+            return body
+    return None
+
+
+def already_merged(lines: list[str], root: Path) -> bool:
+    """True when every Placement row of a change is already reflected in the Source of Truth:
+    the archive merge has run, but the change may not have been moved to the archive yet."""
+    h2 = {n: (ln, body) for n, ln, body in _sections(lines, "##")}
+    if "Placement" not in h2 or "After State" not in h2:
+        return False
+    rows, errs = _parse_placement(h2["Placement"][1])
+    if errs or not rows:
+        return False
+    after_line = h2["After State"][0]
+    next_h2 = min((ln for ln, _ in h2.values() if ln > after_line), default=len(lines) + 1)
+    after = {n: body for n, ln, body in _sections(lines, "###") if after_line < ln < next_h2}
+    for name, target, action, move_from in rows:
+        if action == "remove":
+            if _section_body(root, target, name) is not None:
+                return False
+            continue
+        if name not in after or _section_body(root, target, name) != after[name]:
+            return False
+        if action == "move" and _section_body(root, move_from, name) is not None:
+            return False
+    return True
+
+
 DECISION_FIELDS = ("Rule", "Why", "Source")
 
 
@@ -343,7 +379,10 @@ def main() -> int:
         if path.name == "diagrams.md" and is_change:
             archived = "archive" in path.parts[path.parts.index("changes"):]
             if not (archived and args.include_archive and not args.strict_archive):
-                problems += [(path, n, msg) for n, msg in check_change_structure(path, lines, root, not archived)]
+                # After the archive merge, and before the move, the Before copies no longer match
+                # the Source of Truth by design: skip that check for an already-merged change.
+                verify_before = not archived and not already_merged(lines, root)
+                problems += [(path, n, msg) for n, msg in check_change_structure(path, lines, root, verify_before)]
             if not archived:
                 warnings += [(path, n, msg) for n, msg in ownership_warnings(path, lines, root)]
 

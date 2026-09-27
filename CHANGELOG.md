@@ -10,6 +10,36 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Fixed
+- The validator failed on a change that had just been merged but not yet moved to the
+  archive: its Before copies no longer match the Source of Truth, by design. The
+  archive skill runs the validator at exactly that point and says to fix any errors,
+  so an agent could "fix" the Before copy or merge twice. The validator now
+  recognises an already-merged change (the same check `merge_diagrams.py` uses, now
+  shared) and skips the verbatim-Before check for it.
+- `vsdd-kit status` printed its upgrade command as `vsdd-kit install ...`, which
+  doesn't exist in the user's shell when the kit runs through `uvx`. It now prints the
+  pinned `uvx --from git+https://github.com/joecrowley/vsdd-kit@v<version> vsdd-kit`
+  form, and `vsdd-kit` only when that works (pipx, or an active virtualenv).
+- A re-run of the installer reported "overlay: 8 file change(s)" even when the
+  skills ended up byte-identical: `openspec update` had just regenerated them, and the
+  overlay re-applied the same blocks. It now counts the skill and command files that
+  differ from before the run.
+
+### Changed
+- The archive's decisions step no longer turns the existing pattern into a rule. A
+  change that just follows what the code already does doesn't set a convention, even
+  when its design chose that "for consistency", and most of all when the design lists
+  a cost of the pattern. In a test run, a notes change copied a reload that makes the
+  detail screen flicker, and the archive proposed "Reload After Write: never patch in
+  place", making the bug a rule. As with 0.3.2, existing installs get the new wording
+  when the overlay is re-applied; the `config.yaml` backstop line changes only on new
+  installs.
+- Stopping on uncommitted changes (exit 3): on an install branch with an earlier
+  install, the message says when `--allow-dirty` is safe (the changes are only that
+  install and work done with it, as in a trial run kept uncommitted). The Step 0
+  reference says the same.
+
 ## [0.3.3] - 2026-09-27
 
 ### Fixed

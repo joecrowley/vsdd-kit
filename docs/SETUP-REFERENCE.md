@@ -34,7 +34,10 @@ ls -d "$ROOT"/openspec "$ROOT"/.claude "$ROOT"/.opencode "$ROOT"/.qwen "$ROOT"/.
 Decide:
 
 - **Uncommitted changes** in `ROOT`: **ASK** whether to continue. Recommend
-  committing first so the whole setup can be reviewed as one diff.
+  committing first so the whole setup can be reviewed as one diff. When upgrading
+  an install that was kept uncommitted on its `vsdd-install` branch (a trial run), and
+  the changes are only that install and work done with it, `--allow-dirty` is safe:
+  the upgrade replaces kit files and keeps the project's own.
 - **`openspec` missing or older than 1.2.0**: **ASK** the user to install or upgrade
   it (`npm install -g @fission-ai/openspec@latest`), then re-run the check. Do not
   install global packages yourself without permission.

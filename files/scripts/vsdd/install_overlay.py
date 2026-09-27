@@ -161,6 +161,10 @@ ARCHIVE_DECISIONS = """\
    write still reloads through a loading state, that difference is a convention even
    if design.md doesn't call it one: draft it, and name the code that doesn't follow
    it yet under **Applies to:**.
+   Don't draft a rule that only restates what existing code already does: the code
+   shows that already. This holds even when design.md chose it "for consistency", and
+   most of all when design.md lists a cost of the pattern (for example a reload that
+   discards unsaved input). That cost is a bug waiting to be fixed, not a rule.
    - If yes: draft an entry for `openspec/specs/architecture/decisions.md`
      (create the file with a `# Architecture Decisions` header if needed):
      `## <Stable Name>`, then **Rule:**, **Why:**, **Applies to:** and

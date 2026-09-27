@@ -180,8 +180,16 @@ class Installer:
         if self.is_git and not a.allow_dirty:
             dirty = run(["git", "status", "--porcelain"], root).stdout.strip()
             if dirty:
-                stops.append("the working tree has uncommitted changes. Recommend committing first; "
-                             "to continue anyway, re-run with --allow-dirty")
+                branch = run(["git", "branch", "--show-current"], root, check=False).stdout.strip()
+                if branch.startswith("vsdd-install") and (root / "openspec" / ".vsdd.json").is_file():
+                    stops.append(f"the working tree has uncommitted changes, on the install branch {branch}. "
+                                 "If they are only the earlier install and work done with it (a trial run kept "
+                                 "uncommitted), --allow-dirty is safe: an upgrade replaces kit files and keeps "
+                                 "the project's own (config context, diagrams, decisions). Otherwise recommend "
+                                 "committing first")
+                else:
+                    stops.append("the working tree has uncommitted changes. Recommend committing first; "
+                                 "to continue anyway, re-run with --allow-dirty")
         for tool in self.tools:
             if tool in HOME_TOOLS:
                 folder = Path(HOME_TOOLS[tool]).expanduser().resolve()
@@ -602,8 +610,10 @@ class Installer:
             raise Failed("overlay incomplete. If it says `anchor not found`, the stock skill text changed: "
                          "follow Step 5 of the kit's docs/SETUP-REFERENCE.md to insert those blocks by hand.\n"
                          + (apply.stdout + apply.stderr + check.stdout + check.stderr).strip()[-2000:])
-        changed = sum(1 for l in apply.stdout.splitlines() if l.lstrip().startswith("+"))
-        self.done.append(f"5 overlay: {changed} file change(s); check OK")
+        before = getattr(self, "tool_files_before", {})
+        after = self.tool_files()
+        changed = sum(1 for p, data in after.items() if before.get(p) != data)
+        self.done.append(f"5 overlay: {changed} skill/command file(s) differ from before this run; check OK")
 
     def step6_decisions(self) -> None:
         path = self.root / "openspec" / "specs" / "architecture" / "decisions.md"
@@ -642,9 +652,19 @@ class Installer:
                          + (f" ({stamp['kit_commit']})" if stamp["kit_commit"] else ""))
 
     # ------------------------------------------------------------------ main
+    def tool_files(self) -> dict[Path, bytes]:
+        """Contents of the skill and command files in the tool folders the overlay patches."""
+        dirs = {self.root / d for dirs in TOOL_DIRS.values() for d in dirs} | set(self.extra_dirs)
+        return {p: p.read_bytes() for d in dirs if d.is_dir()
+                for p in d.rglob("*") if p.is_file()
+                and (p.name == "SKILL.md" or "opsx" in p.name or p.parent.name == "opsx")}
+
     def run_all(self) -> int:
         self.prerequisites()
         self.inspect()
+        # `openspec update` (Step 1) regenerates stock files that the overlay then patches
+        # again, so compare with the files as they were before the run, not after Step 1.
+        self.tool_files_before = {} if self.args.dry_run else self.tool_files()
         for step in (self.step0_branch_and_snapshot, self.step1_openspec, self.step2_copy,
                      self.step3_config, self.step4_agents, self.step5_overlay, self.step6_decisions,
                      self.step7_stamp):

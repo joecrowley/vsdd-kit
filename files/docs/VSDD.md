@@ -150,7 +150,9 @@ lessons:
   that deliberately does something differently from existing code doing the same
   kind of thing (say, it refreshes in place after a write while another write still
   reloads) sets a convention too, and the entry's **Applies to:** names the code
-  that doesn't follow it yet. If the
+  that doesn't follow it yet. A change that just follows the existing pattern doesn't:
+  the code already shows it, and if the design lists a cost of that pattern, the cost is
+  a bug to fix later, not a rule to keep. If the
   design overrode a rule, it asks whether to update or retire that entry. The archive
   summary has a **Decisions** line.
 - **Pitfalls in context:** copy the one to three costliest rules, one line each, into

@@ -106,6 +106,8 @@ grep -q "vsdd:archive-decisions" .*/skills/openspec-archive-change/SKILL.md && g
   && pass "decisions steps patched into propose and archive" || fail "decisions steps missing"
 grep -q "deliberately does" .*/skills/openspec-archive-change/SKILL.md && grep -q "deliberately does" openspec/config.yaml \
   && pass "archive decisions step covers a change that diverges from existing code" || fail "archive decisions step misses divergence"
+grep -q "only restates what existing code" .*/skills/openspec-archive-change/SKILL.md && grep -q "only restates what existing code" openspec/config.yaml \
+  && pass "archive decisions step won't turn the existing pattern into a rule" || fail "archive decisions step misses the restate case"
 for s in propose apply-change verify-change archive-change continue-change ff-change update-change bulk-archive-change; do
   for f in .*/skills/openspec-$s/SKILL.md; do
     [ -e "$f" ] || continue
@@ -194,6 +196,8 @@ grep -q "^## End-to-End Data Flow" "$SOT" && pass "untouched section kept" || fa
   && pass "add created the capability diagrams file" || fail "add did not create the file"
 python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test | grep -q "already merged" \
   && pass "second merge is a no-op" || fail "second merge not idempotent"
+python3 scripts/vsdd/validate_mermaid.py >/dev/null \
+  && pass "validator accepts a merged change that hasn't been moved to the archive yet" || fail "validator rejects a merged, unmoved change"
 MH="$(sed -n '/^## Module Hierarchy/,/^## End-to-End/p' $SOT | sed '1d;$d')"
 { printf '## Diagram needed?\n\nYES - move\n\n## Placement\n\n| Stable name | Source of Truth file | Action |\n|---|---|---|\n'
   printf '| Module Hierarchy | specs/smoke-cap/diagrams.md | move from specs/architecture/diagrams.md |\n| Smoke Flow | specs/smoke-cap/diagrams.md | remove |\n\n'
@@ -348,10 +352,15 @@ rc=0; OUT="$(python3 "$INST" --root . --status 2>&1)" || rc=$?
 [ "$rc" = 1 ] && grep -q "validate_mermaid.py" <<<"$OUT" && grep -q -- "--tools $TOOLS" <<<"$OUT" \
   && pass "--status: a stale script means an upgrade is due, with the command to run" || fail "--status missed a stale script (exit $rc)"
 mv "$ROOT5.bak" scripts/vsdd/validate_mermaid.py
+rc=0; OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" || rc=$?
+[ "$rc" = 3 ] && grep -q "allow-dirty is safe" <<<"$OUT" \
+  && pass "re-run over an uncommitted install explains when --allow-dirty is safe" || fail "uncommitted install re-run: exit $rc"
 git add -A; git -c user.email=s@t -c user.name=smoke commit -qm install
 NSNAP=$(ls "$IH/.vsdd-snapshots" | wc -l)
-HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 && [ -z "$(git status --porcelain)" ] \
+OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && [ -z "$(git status --porcelain)" ] \
   && pass "re-run (upgrade) is idempotent" || fail "re-run changed files: $(git status --porcelain | head -3)"
+grep -q "5 overlay: 0 skill/command file(s) differ" <<<"$OUT" \
+  && pass "re-run reports 0 overlay changes, although openspec update regenerated the stock files" || fail "re-run overlay count: $(grep '5 overlay' <<<"$OUT")"
 [ "$(ls "$IH/.vsdd-snapshots" | wc -l)" = "$NSNAP" ] && pass "re-run on the install branch reuses the pre-install snapshot" \
   || fail "re-run took a new snapshot of a half-installed state"
 ROOT8="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-again.XXXXXX")"
@@ -495,7 +504,8 @@ if command -v uv >/dev/null; then
     echo "  skip  CI template steps (PyYAML not installed)"
   fi
   OUT="$(VK status --root . || true)"
-  grep -q "vsdd-kit install --root" <<<"$OUT" && pass "vsdd-kit status prints a vsdd-kit upgrade command" || fail "status upgrade command"
+  grep -q "uvx --from git+https://github.com/joecrowley/vsdd-kit@v$(cat "$KIT/VERSION") vsdd-kit install --root" <<<"$OUT" \
+    && pass "vsdd-kit status under uvx prints the full uvx upgrade command" || fail "status upgrade command: $OUT"
   cd "$ROOT"
 else
   echo "  skip  uv not installed"
