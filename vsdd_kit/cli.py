@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 import runpy
+import shutil
 import sys
 from pathlib import Path
 
@@ -29,6 +30,7 @@ HERE = Path(__file__).resolve().parent
 # Installed: the kit is inside the package. From a clone: the package sits in the kit.
 KIT = HERE if (HERE / "files").is_dir() else HERE.parent
 SCRIPTS = KIT / "files" / "scripts" / "vsdd"
+REPO = "git+https://github.com/joecrowley/vsdd-kit"
 
 COMMANDS = {
     "install": ("vsdd_install.py", []),
@@ -47,11 +49,32 @@ def version() -> str:
     return (KIT / "VERSION").read_text(encoding="utf-8").strip()
 
 
+def cli_command() -> str | None:
+    """How the user can run this entry point again, for the commands the scripts print.
+
+    `vsdd-kit` only when it works from the user's shell: installed with pipx (on PATH
+    outside this environment) or in the active virtualenv. uvx puts a temporary
+    environment's bin on PATH for this process only, so under uvx, name the pinned
+    uvx command instead. None from a clone: the scripts then print their own path."""
+    own_bin = Path(sys.prefix) / "bin"
+    path = os.pathsep.join(p for p in os.environ.get("PATH", "").split(os.pathsep) if p and Path(p) != own_bin)
+    if shutil.which("vsdd-kit", path=path) or os.environ.get("VIRTUAL_ENV") == sys.prefix:
+        return "vsdd-kit"
+    if KIT == HERE:
+        return f"uvx --from {REPO}@v{version()} vsdd-kit"
+    return None
+
+
 def run_script(name: str, extra: list[str], args: list[str], command: str) -> int:
     script = SCRIPTS / name
     # The scripts print commands to re-run (e.g. `status` prints the upgrade command):
-    # name this entry point, not a file inside a temporary uvx environment.
-    os.environ["VSDD_KIT_CLI"] = "vsdd-kit"
+    # name a command that works from the user's shell, not a file inside a temporary
+    # uvx environment.
+    cli = cli_command()
+    if cli:
+        os.environ["VSDD_KIT_CLI"] = cli
+    else:
+        os.environ.pop("VSDD_KIT_CLI", None)
     sys.argv = [f"vsdd-kit {command}", *extra, *args]
     sys.path.insert(0, str(SCRIPTS))
     try:
