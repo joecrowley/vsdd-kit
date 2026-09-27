@@ -336,6 +336,8 @@ python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "installer: validato
 CLAUDE_OK=1; [[ "$TOOLS" == *claude* ]] && ! grep -q "@AGENTS.md" CLAUDE.md 2>/dev/null && CLAUDE_OK=0
 [ -f openspec/specs/architecture/decisions.md ] && [ ! -d openspec/changes/vsdd-install-check ] && [ "$CLAUDE_OK" = 1 ] \
   && pass "installer: decisions log, no leftover check change, CLAUDE.md" || fail "installer: files"
+grep -q "OpenSpec Contributors" openspec/schemas/visual-driven/schema.yaml && openspec schema validate visual-driven >/dev/null 2>&1 \
+  && pass "installer: schema carries the OpenSpec notice and validates" || fail "installer: schema notice"
 grep -q "fill in \`context:\`" <<<"$OUT" && grep -q "Step 6: seed" <<<"$OUT" \
   && pass "installer lists the judgement steps left (context, baseline diagrams)" || fail "installer to-do list"
 python3 -c "import json,sys; d=json.load(open('openspec/.vsdd.json')); sys.exit(d['kit_version'] != open(sys.argv[1]).read().strip())" "$KIT/VERSION" \
@@ -452,6 +454,7 @@ if command -v uv >/dev/null; then
   KP="$(VK path)"
   [ -f "$KP/SETUP.md" ] && [ -f "$KP/docs/SETUP-REFERENCE.md" ] && [ -f "$KP/files/openspec/config.yaml.example" ] \
     && pass "vsdd-kit path is a complete kit (usable as KIT in SETUP.md)" || fail "packaged kit incomplete"
+  grep -q "OpenSpec Contributors" "$KP/THIRD_PARTY_NOTICES.md" 2>/dev/null && pass "package carries THIRD_PARTY_NOTICES.md" || fail "package lacks THIRD_PARTY_NOTICES.md"
   G1="$(VK guide)"; G2="$(VK guide --reference)"
   [ "$(head -1 <<<"$G1")" = "# VSDD Setup Runbook (for AI coding agents)" ] && [ "$(head -1 <<<"$G2")" = "# VSDD Setup Reference" ] \
     && pass "vsdd-kit guide prints SETUP.md and the reference" || fail "vsdd-kit guide"

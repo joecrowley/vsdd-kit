@@ -324,6 +324,7 @@ vsdd-kit/
 ├── CONTRIBUTING.md              ← setup, rules for changes, OpenSpec upgrades, releasing
 ├── docs/SETUP-REFERENCE.md      ← Steps 0–5 by hand, workspaces, maintenance, troubleshooting, rollback
 ├── VERSION                      ← kit version, recorded in each install's openspec/.vsdd.json
+├── THIRD_PARTY_NOTICES.md       ← credits and licenses for adapted material (OpenSpec's schema)
 ├── pyproject.toml, vsdd_kit/    ← the `vsdd-kit` command: the kit as a package (uvx, pipx)
 ├── .github/workflows/smoke.yml  ← the kit's own CI: smoke test, weekly against the latest OpenSpec
 ├── docs/WHY_VSDD.md             ← the case for adopting VSDD

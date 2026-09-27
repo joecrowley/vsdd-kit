@@ -1,3 +1,7 @@
+# Adapted from OpenSpec's `spec-driven` schema (https://github.com/Fission-AI/OpenSpec),
+# Copyright (c) 2024 OpenSpec Contributors, MIT License. The templates in templates/
+# are adapted from it too. Full notice: THIRD_PARTY_NOTICES.md in the VSDD kit
+# (https://github.com/joecrowley/vsdd-kit).
 name: visual-driven
 version: 1
 description: Visual SDD workflow - proposal → diagrams → specs → design → tasks

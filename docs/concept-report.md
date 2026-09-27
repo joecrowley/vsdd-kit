@@ -1,3 +1,10 @@
+> **About this report.** This is the background research that motivated VSDD, written
+> before the kit was built. It is kept as it was, so it doesn't describe the kit as it
+> works today: see the [README](../README.md) and [`WHY_VSDD.md`](WHY_VSDD.md) for that.
+> Its sources are listed at the end, but individual claims and figures aren't linked to
+> a specific source, and some sources are secondary (blog posts, videos). Check a claim
+> against the original before you quote it.
+
 Elevating Spec-Driven Development in Flutter: Integrating LLM-Generated Diagrams and Archival Workflows within OpenSpec
 
 The integration of Large Language Models (LLMs) into software engineering has initiated a paradigm shift from ad-hoc code generation—often pejoratively termed "vibe coding"—to structured, intent-based engineering. Spec-Driven Development (SDD) frameworks, with OpenSpec at the forefront, formalize this process by establishing a rigorous specification layer between human intent and artificial intelligence execution. For development teams operating within the Flutter and Dart ecosystems, which frequently span mobile clients, web applications, and backend infrastructure, the purely textual nature of traditional SDD presents a distinct limitation. Complex state transitions within Riverpod, asynchronous isolate communication, and intricate GoRouter navigation paths demand visual representation to be fully comprehended.
