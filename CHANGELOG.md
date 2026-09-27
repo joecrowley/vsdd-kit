@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-09-28
+
 ### Changed
 - A decision's **Source:** is the change's dated archive folder name
   (`2026-01-15-fix-detail-flicker`). The archive's decisions step runs before the
@@ -182,7 +184,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.1...v0.3.2
