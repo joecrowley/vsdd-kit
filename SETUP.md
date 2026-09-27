@@ -232,9 +232,14 @@ Reply with:
 - Needs your attention: <anything skipped, failed, or deferred>
 - To undo the whole install: see "Roll back an install" in docs/SETUP-REFERENCE.md in the kit
 
-Next: start a new agent session, then try `/opsx:propose <small change with a visual impact>`
+Next: start a new agent session, then try `<propose command> <small change with a visual impact>`
 and review its diagrams.md.
 ```
+
+Write `<propose command>` in the form the installed tools use: `/opsx:propose` in Claude
+Code, `/opsx-propose` in OpenCode and Qwen. For other tools, take the name from the
+command files the install created (for example `.<tool>/commands/opsx-propose.md` is
+`/opsx-propose`). With several tools, give each tool's form.
 
 Most agents load slash commands and skills only when a session starts, so the
 `/opsx` commands the install created aren't available in the session that ran it.
