@@ -168,7 +168,9 @@ ARCHIVE_DECISIONS = """\
    - If yes: draft an entry for `openspec/specs/architecture/decisions.md`
      (create the file with a `# Architecture Decisions` header if needed):
      `## <Stable Name>`, then **Rule:**, **Why:**, **Applies to:** and
-     **Source:** `<the archived change folder name>`. Show it and **ask the user**
+     **Source:** the change's archive folder name, which is today's date and the
+     change name (`2026-01-15-fix-detail-flicker`). The change is moved there after
+     this step, so form the name yourself. Show it and **ask the user**
      before adding it. Keep it to a few lines.
    - If the change's design.md has `Overrides: <Stable Name>`, ask whether that
      entry should be updated or retired.

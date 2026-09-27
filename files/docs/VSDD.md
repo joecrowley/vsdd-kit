@@ -140,8 +140,9 @@ lessons:
 
 - **File:** `openspec/specs/architecture/decisions.md`. Each rule is one
   `## <Stable Name>` section with **Rule:**, **Why:**, **Applies to:** and
-  **Source:** (the archived change it came from). The validator checks that Rule,
-  Why and Source are present.
+  **Source:** (the archived change it came from, by its dated folder name, e.g.
+  `2026-01-15-fix-detail-flicker`, or `install`). The validator checks that Rule, Why
+  and Source are present, and warns about a Source without a date.
 - **Design:** before writing `design.md` (or `tasks.md`, when there is no design),
   read the log and follow every rule that applies. To break one deliberately, write
   `Overrides: <Stable Name> - <why>` under Decisions in `design.md`.

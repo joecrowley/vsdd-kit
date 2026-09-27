@@ -10,6 +10,13 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Changed
+- A decision's **Source:** is the change's dated archive folder name
+  (`2026-01-15-fix-detail-flicker`). The archive's decisions step runs before the
+  change is moved, so agents saw only the bare change name and wrote that. The step now
+  says to form the name from today's date and the change name, and the validator warns
+  (without failing) about a Source that has no date and isn't `install`.
+
 ## [0.3.4] - 2026-09-27
 
 ### Fixed
