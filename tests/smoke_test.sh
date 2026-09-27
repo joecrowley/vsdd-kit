@@ -121,7 +121,10 @@ cp "$KIT"/files/openspec/specs/architecture/diagrams.md.example openspec/specs/a
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "seed diagrams lint clean" || fail "seed diagrams lint"
 DEC=openspec/specs/architecture/decisions.md
 cp "$KIT"/files/openspec/specs/architecture/decisions.md.example "$DEC"
-python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "decisions log validates" || fail "decisions log rejected"
+OUT="$(python3 scripts/vsdd/validate_mermaid.py 2>&1)" && ! grep -q "warning" <<<"$OUT" && pass "decisions log validates" || fail "decisions log rejected: $OUT"
+sed -i.bak 's/\*\*Source:\*\* 2026-01-15-fix-detail-flicker/**Source:** fix-detail-flicker/' "$DEC" && rm -f "$DEC.bak"
+OUT="$(python3 scripts/vsdd/validate_mermaid.py 2>&1)" && grep -q "Source fix-detail-flicker should be the archived change folder name" <<<"$OUT" \
+  && pass "decision Source without a date: warning, not a failure" || fail "undated Source: $OUT"
 sed -i.bak '/\*\*Rule:\*\*/d' "$DEC" && rm -f "$DEC.bak"
 grep -q "needs \*\*Rule:\*\*" <<<"$(python3 scripts/vsdd/validate_mermaid.py 2>&1 || true)" && pass "decision without a Rule caught" || fail "decision without a Rule not caught"
 rm -f "$DEC"

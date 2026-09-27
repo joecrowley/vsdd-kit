@@ -24,6 +24,7 @@ Structure checks (active change diagrams.md files):
 
 Decisions log (openspec/specs/**/decisions.md):
   - every `## <Stable Name>` entry has **Rule:**, **Why:** and **Source:** lines
+  - warning: a Source that isn't a dated archive folder name (2026-01-15-fix-x) or `install`
 
 Ownership warnings (active changes; printed, but they don't fail the run):
   - the change creates a capability (it has specs/<cap>/ and openspec/specs/<cap>/
@@ -297,6 +298,24 @@ def check_decisions(lines: list[str]) -> list[tuple[int, str]]:
     return errors
 
 
+SOURCE_RE = re.compile(r"^(install|\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*)$")
+
+
+def decision_warnings(lines: list[str]) -> list[tuple[int, str]]:
+    """A decision's **Source:** names archived changes by their dated folder name
+    (2026-01-15-fix-detail-flicker), or `install`, so the entry can be traced back."""
+    warnings = []
+    for name, line_no, body in _sections(lines, "##"):
+        m = re.search(r"\*\*Source:\*\*\s*(.+)", body)
+        if not m:
+            continue
+        bad = [s for s in (p.strip().strip("`") for p in m.group(1).split(",")) if s and not SOURCE_RE.match(s)]
+        if bad:
+            warnings.append((line_no, f"decision '{name}': Source {', '.join(bad)} should be the archived "
+                             "change folder name, with its date (e.g. 2026-01-15-fix-detail-flicker), or 'install'"))
+    return warnings
+
+
 def new_capabilities(change_dir: Path, root: Path) -> list[str]:
     """Capabilities this change creates: specs/<cap>/ in the change, not yet in openspec/specs/."""
     specs = change_dir / "specs"
@@ -375,6 +394,7 @@ def main() -> int:
             to_render.append((path, start, block))
         if path.name == "decisions.md" and "specs" in path.parts and "changes" not in path.parts:
             problems += [(path, n, msg) for n, msg in check_decisions(lines)]
+            warnings += [(path, n, msg) for n, msg in decision_warnings(lines)]
         is_change = "changes" in path.parts and "specs" not in path.parts[path.parts.index("changes"):]
         if path.name == "diagrams.md" and is_change:
             archived = "archive" in path.parts[path.parts.index("changes"):]

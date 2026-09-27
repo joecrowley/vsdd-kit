@@ -17,4 +17,4 @@ problem it guards against, and say so in the archive summary of that change.
 - **Why:** a loading state drops the current item, so a detail screen watching it
   flashes "not found" until the reload finishes.
 - **Applies to:** every state holder that reloads data after a mutation.
-- **Source:** <archived change name, e.g. 2026-01-15-fix-detail-flicker>
+- **Source:** 2026-01-15-fix-detail-flicker
