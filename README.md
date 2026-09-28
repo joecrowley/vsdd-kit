@@ -100,13 +100,24 @@ transitions to the ReadingListCubit state machine.
 
 ## Quick start
 
-**Requirements:** [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec) ≥ 1.2.0 and
-Python ≥ 3.9. Optional: [mermaid-cli](https://github.com/mermaid-js/mermaid-cli) (`mmdc`),
-for render checks.
+**Requirements:**
+- [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec) ≥ 1.2.0 (needs Node.js).
+- Python ≥ 3.9, as `python3` on your PATH. The skills run the scripts VSDD copies into
+  your project with `python3`, so you need it even if you install the kit with `uvx`.
+  The installer checks it and stops (exit 2) if it's missing or too old.
+- [uv](https://docs.astral.sh/uv/), for the `uvx` command below. Without it, clone the
+  kit instead (see below).
+- Optional: [mermaid-cli](https://github.com/mermaid-js/mermaid-cli) (`mmdc`), for render
+  checks.
 
 ```bash
 npm install -g @fission-ai/openspec
+python3 --version                                  # 3.9 or later
+brew install uv          # or: curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+
+On macOS, `python3` may be a stub that asks to install the Xcode command-line tools;
+`brew install python` or the installer from python.org gives you a real one.
 
 Then open your project in your AI coding tool and say:
 
@@ -115,8 +126,9 @@ Then open your project in your AI coding tool and say:
 > and follow the runbook it prints. `KIT` is the folder printed by
 > `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.5 vsdd-kit path`.
 
-This needs [uv](https://docs.astral.sh/uv/). `uvx` runs the kit from that release
-tag without cloning it or installing anything for good. `pipx run --spec
+This needs [uv](https://docs.astral.sh/uv/) (see Requirements). `uvx` runs the kit from
+that release tag without cloning it or installing anything for good. It brings its own
+Python for the kit, but not for your project: you still need `python3`. `pipx run --spec
 git+https://github.com/joecrowley/vsdd-kit@v0.3.5 vsdd-kit ...` works too.
 
 **Or clone it**, which you need for the kit-in-your-workspace setup

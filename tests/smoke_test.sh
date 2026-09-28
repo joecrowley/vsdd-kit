@@ -333,6 +333,13 @@ cd "$ROOT5"; git init -q; echo "# demo" > README.md; git add -A; git -c user.ema
 echo "stray" > stray.txt
 rc=0; HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" >/dev/null 2>&1 || rc=$?
 [ "$rc" = 3 ] && [ ! -d openspec ] && pass "stops on a dirty tree before changing anything (exit 3)" || fail "dirty tree: exit $rc"
+rc=0; OUT="$(VSDD_PYTHON=vsdd-no-such-python HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" || rc=$?
+[ "$rc" = 2 ] && grep -q "not found" <<<"$OUT" && [ ! -d openspec ] \
+  && pass "a missing python3 for the project scripts exits 2" || fail "missing python3: exit $rc"
+printf '#!/bin/sh\necho 3.8.10\n' > "$IH/old-python"; chmod +x "$IH/old-python"
+rc=0; OUT="$(VSDD_PYTHON="$IH/old-python" HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" || rc=$?
+[ "$rc" = 2 ] && grep -q "older than 3.9" <<<"$OUT" && [ ! -d openspec ] \
+  && pass "a python3 older than 3.9 exits 2" || fail "old python3: exit $rc"
 rm stray.txt
 HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" --dry-run >/dev/null 2>&1 && [ ! -d openspec ] \
   && [ "$(git branch --show-current)" != vsdd-install ] && pass "dry run changes nothing" || fail "dry run changed something"

@@ -10,6 +10,18 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Fixed
+- The installer didn't check Python, although `SETUP.md` said it exits 2 for
+  Python < 3.9. Under `uvx` the install itself worked with uv's own Python, but every
+  later step (validator, archive merge, overlay) runs `python3 scripts/vsdd/...` and
+  failed when `python3` was missing, didn't run (macOS's Xcode stub) or was too old.
+  The installer now checks that `python3` is on PATH, runs, and is 3.9 or later, and
+  exits 2 with how to fix it before changing anything.
+
+### Changed
+- README requirements list `python3` (and why `uvx` doesn't replace it), uv with its
+  install command, and the macOS `python3` stub.
+
 ## [0.3.5] - 2026-09-28
 
 ### Changed

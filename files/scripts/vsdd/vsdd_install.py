@@ -114,6 +114,31 @@ def run(cmd: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedPr
     return proc
 
 
+PYTHON_FIX = ("ASK the user to install Python 3.9 or later so that `python3` is on PATH (macOS: "
+              "`brew install python` or python.org; Linux: the package manager; Windows: python.org). "
+              "uv's own Python doesn't count: it runs this installer, but not the scripts the skills run later")
+
+
+def check_project_python() -> None:
+    """The skills run the copied scripts as `python3 scripts/vsdd/...`, so a `python3` of 3.9
+    or later must be on PATH, even when this installer runs under uvx's own Python.
+    VSDD_PYTHON names another interpreter to check (used by the kit's tests)."""
+    py = os.environ.get("VSDD_PYTHON", "python3")
+    if shutil.which(py) is None:
+        raise SystemExit(f"error: `{py}` not found. {PYTHON_FIX}")
+    try:
+        proc = subprocess.run([py, "-c", "import sys; print('%d.%d.%d' % sys.version_info[:3])"],
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        proc = None
+    if proc is None or proc.returncode != 0:
+        # e.g. macOS's /usr/bin/python3 without the Xcode command-line tools
+        raise SystemExit(f"error: `{py}` is on PATH but doesn't run. {PYTHON_FIX}")
+    found = proc.stdout.strip()
+    if version_tuple(found) < (3, 9, 0):
+        raise SystemExit(f"error: `{py}` is Python {found}, older than 3.9. {PYTHON_FIX}")
+
+
 def version_tuple(text: str) -> tuple[int, ...]:
     m = re.search(r"(\d+)\.(\d+)\.(\d+)", text)
     return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
@@ -166,6 +191,7 @@ class Installer:
         self.version = run(["openspec", "--version"], self.root).stdout.strip()
         if version_tuple(self.version) < (1, 2, 0):
             raise SystemExit(f"error: OpenSpec {self.version} is older than 1.2.0 - ASK the user to upgrade")
+        check_project_python()
         if self.tools == ["none"]:
             return
         unknown = [t for t in self.tools if t not in TOOL_DIRS and t not in HOME_TOOLS]
