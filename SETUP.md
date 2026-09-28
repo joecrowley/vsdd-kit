@@ -65,9 +65,10 @@ before changing anything and names the flag that records the user's answer.
      | (Optional) keep the kit's docs and scripts out of the project | `--tooling-dir <folder>` | Workspaces with a shared command folder |
      | Hand-edited skills | none: do Step 1b by hand, then re-run | Step 1b |
 
-   - **Exit 2:** a prerequisite is missing (OpenSpec CLI ≥ 1.2.0, Python ≥ 3.9, tool
-     ids). It says which; **ASK** the user to fix it. Don't install global packages
-     yourself without permission.
+   - **Exit 2:** a prerequisite is missing (OpenSpec CLI ≥ 1.2.0, `python3` ≥ 3.9 on
+     PATH, tool ids). It says which; **ASK** the user to fix it. Don't install global
+     packages yourself without permission. Under `uvx` the installer has its own
+     Python, but the project's scripts run with `python3`, so the check applies too.
 3. Run it without `--dry-run`, with the same flags.
    - **Exit 0:** Steps 0–5 are done. Do the items in its **"Left for you"** list, in
      order ([below](#the-installers-to-do-list)), then Steps 6 to 9.
