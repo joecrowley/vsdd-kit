@@ -81,6 +81,14 @@ artifacts:
 
 
       Step 4 - Write the delta:
+      - First check each Source of Truth section you will copy against the code:
+      `python3 scripts/vsdd/validate_mermaid.py` warns about names the code no
+      longer has, and the code behind the participants, calls and transitions
+      this change relies on must still match. If a section is stale, copy it
+      verbatim anyway, make its After match the real code plus this change, and
+      add a top-level `## Source of Truth drift` section (a list, never merged)
+      saying what the diagram says and what the code does. List stale sections
+      this change does not touch there too, and suggest a separate sync change.
       - `## Before State`: for every update, move and remove row, copy the
       `## <Stable Name>` section VERBATIM from the file the row names (for a
       move, from the old file) as `### <Stable Name>`. Nothing else.

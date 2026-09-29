@@ -58,6 +58,10 @@ jobs:
             echo "VSDD_OVERLAY=$kit overlay --root ." >> "$GITHUB_ENV"
           fi
 
+      # Source of Truth drift (diagrams naming code that no longer exists) is reported as
+      # warnings. To make it fail the build, add --names-strict. To catch drift when code
+      # changes, not only when openspec/ changes, add your source folders (e.g. "lib/**")
+      # to `paths` at the top, or remove the filter.
       - name: Lint and render diagrams (Source of Truth + active changes)
         run: $VSDD_VALIDATE --render
 

@@ -22,6 +22,12 @@ Structure checks (active change diagrams.md files):
   - a row that adds or moves a diagram INTO specs/architecture/diagrams.md has a
     4th column, `Why here`, saying why it spans capabilities
 
+Source of Truth drift (openspec/specs/**/diagrams.md; warnings unless --names-strict):
+  - every code-like name in a diagram (CamelCase, snake_case, or followed by "(") must
+    appear somewhere in the project's source files; a missing one was probably renamed
+    or removed. Labels that are not code go on a `%% vsdd:not-code <names>` line in the
+    diagram. Skipped when the project has no source files.
+
 Decisions log (openspec/specs/**/decisions.md):
   - every `## <Stable Name>` entry has **Rule:**, **Why:** and **Source:** lines
   - warning: a Source that isn't a dated archive folder name (2026-01-15-fix-x) or `install`
@@ -34,6 +40,7 @@ Usage:
   python3 scripts/vsdd/validate_mermaid.py                 # openspec/specs + active changes
   python3 scripts/vsdd/validate_mermaid.py --render        # plus mmdc parse
   python3 scripts/vsdd/validate_mermaid.py --include-archive
+  python3 scripts/vsdd/validate_mermaid.py --names-strict   # drift in the Source of Truth fails the run
   python3 scripts/vsdd/validate_mermaid.py path/to/file.md ...
 
 Exit code 0 = clean, 1 = errors found, 2 = bad invocation.
@@ -42,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -54,6 +62,77 @@ FLOW_HEADER_RE = re.compile(r"^\s*(flowchart|graph)\b")
 SEQ_SHORTHAND_RE = re.compile(r"(--?>>|--?>|--?x|--?\))[+-]")
 QUOTED_ALIAS_RE = re.compile(r'^\s*(participant|actor)\s+\S+\s+as\s+"')
 GATE_RE = re.compile(r"^\s*(YES|NO)\b", re.IGNORECASE)
+
+
+SOURCE_EXTS = {".dart", ".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".java", ".kt", ".kts",
+               ".swift", ".go", ".rb", ".cs", ".php", ".rs", ".c", ".cc", ".cpp", ".h", ".hpp",
+               ".m", ".mm", ".scala", ".ex", ".exs", ".vue", ".svelte"}
+SKIP_DIRS = {"openspec", "node_modules", "build", "dist", "out", "target", "vendor", "Pods",
+             "coverage", "__pycache__", "venv", "env"}
+MERMAID_WORDS = {"sequenceDiagram", "stateDiagram", "erDiagram", "classDiagram", "flowchart",
+                 "graph", "gantt", "mindmap", "journey", "gitGraph", "quadrantChart", "timeline",
+                 "requirementDiagram", "xychart", "sankey", "classDef", "linkStyle", "subgraph"}
+NOT_CODE_RE = re.compile(r"^\s*%%\s*vsdd:not-code\s+(.*)$")
+IDENT_RE = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
+
+
+def source_identifiers(root: Path) -> tuple[set[str], int]:
+    """Every identifier-like word in the project's source files (definitions, uses,
+    import paths). Skips hidden folders, build output, openspec/ and the kit's own
+    scripts/vsdd/. Returns (words, number of files read)."""
+    words: set[str] = set()
+    count = 0
+    for dirpath, dirnames, filenames in os.walk(root):
+        rel = Path(dirpath).relative_to(root).parts
+        dirnames[:] = [d for d in dirnames if not d.startswith(".") and d not in SKIP_DIRS
+                       and not (rel == ("scripts",) and d == "vsdd")]
+        for name in filenames:
+            if Path(name).suffix in SOURCE_EXTS:
+                try:
+                    words |= set(IDENT_RE.findall((Path(dirpath) / name).read_text(encoding="utf-8", errors="ignore")))
+                    count += 1
+                except OSError:
+                    pass
+    return words, count
+
+
+def code_names(block: list[str]) -> tuple[set[str], set[str]]:
+    """(code-like names used in a diagram, names its `%% vsdd:not-code` lines exempt)."""
+    exempt: set[str] = set()
+    text = []
+    for line in block:
+        m = NOT_CODE_RE.match(line)
+        if m:
+            exempt |= set(IDENT_RE.findall(m.group(1)))
+        elif not line.strip().startswith("%%"):
+            text.append(line)
+    body = "\n".join(text)
+    names = set()
+    for tok in IDENT_RE.findall(body):
+        if tok in MERMAID_WORDS or tok.isupper() or len(tok) < 3:
+            continue
+        camel = re.search(r"[a-z][A-Z]", tok) or re.match(r"^[A-Z][a-z0-9]+[A-Z]", tok)
+        snake = "_" in tok.strip("_") and not tok.isupper()
+        if camel or snake:
+            names.add(tok)
+    names |= {t for t in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\(", body) if len(t) >= 3}
+    return names - exempt, exempt
+
+
+def drift_warnings(lines: list[str], known: set[str]) -> list[tuple[int, str]]:
+    """Names in a Source of Truth diagram that no longer appear in the project's code."""
+    heads = [(ln, n) for n, ln, _ in _sections(lines, "##")]
+    blocks, _ = extract_blocks(lines)
+    out = []
+    for start, block in blocks:
+        section = next((n for ln, n in reversed(heads) if ln < start), "?")
+        names, _ = code_names(block)
+        missing = sorted(n for n in names if n not in known)
+        if missing:
+            out.append((start, f"'{section}': {', '.join(missing)} not found in the project's code "
+                        "(renamed or removed?). Check the section against the code; if a name is "
+                        "not code, list it on a `%% vsdd:not-code <names>` line in the diagram"))
+    return out
 
 
 def find_files(root: Path, include_archive: bool) -> list[Path]:
@@ -373,6 +452,9 @@ def main() -> int:
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="project root (default: cwd)")
     parser.add_argument("--render", action="store_true", help="also parse each diagram with mmdc")
     parser.add_argument("--include-archive", action="store_true", help="also scan openspec/changes/archive")
+    parser.add_argument("--names-strict", action="store_true",
+                        help="fail (not just warn) when a Source of Truth diagram names something the code no longer has")
+    parser.add_argument("--no-names", action="store_true", help="skip the Source of Truth drift check")
     parser.add_argument("--strict-archive", action="store_true",
                         help="also apply the change-structure checks to archived changes (older ones predate Placement)")
     args = parser.parse_args()
@@ -383,6 +465,7 @@ def main() -> int:
     warnings: list[tuple[Path, int, str]] = []
     to_render: list[tuple[Path, int, list[str]]] = []
     block_count = 0
+    known, n_sources = (set(), 0) if args.no_names else source_identifiers(root)
 
     for path in files:
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -392,6 +475,13 @@ def main() -> int:
         for start, block in blocks:
             problems += [(path, n, msg) for n, msg in lint_block(start, block)]
             to_render.append((path, start, block))
+        in_specs = "specs" in path.parts and "changes" not in path.parts
+        if path.name == "diagrams.md" and in_specs and n_sources:
+            found = [(path, n, msg) for n, msg in drift_warnings(lines, known)]
+            if args.names_strict:
+                problems += found
+            else:
+                warnings += found
         if path.name == "decisions.md" and "specs" in path.parts and "changes" not in path.parts:
             problems += [(path, n, msg) for n, msg in check_decisions(lines)]
             warnings += [(path, n, msg) for n, msg in decision_warnings(lines)]

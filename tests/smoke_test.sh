@@ -59,7 +59,7 @@ cp "$KIT"/files/openspec/config.yaml.example openspec/config.yaml
 openspec new change vsdd-smoke-test >/dev/null 2>&1 || fail "openspec new change"
 grep -q "schema: visual-driven" openspec/changes/vsdd-smoke-test/.openspec.yaml && pass "change uses visual-driven" || fail "wrong schema on change"
 OUT="$(openspec instructions diagrams --change vsdd-smoke-test 2>/dev/null)"
-for pat in "<project_context>" "<rules>" "MERMAID_RULES"; do
+for pat in "<project_context>" "<rules>" "MERMAID_RULES" "Source of Truth drift"; do
   grep -q "$pat" <<<"$OUT" && pass "diagrams instructions contain $pat" || fail "missing $pat in instructions"
 done
 openspec instructions design --change vsdd-smoke-test 2>/dev/null | grep -q "decisions.md" \
@@ -104,6 +104,8 @@ grep -q "wrapper stale" <<<"$(python3 scripts/vsdd/install_overlay.py --check 2>
   && grep -q "follow it exactly" "$W" && pass "stale command wrapper detected and refreshed" || fail "stale wrapper not refreshed"
 grep -q "vsdd:archive-decisions" .*/skills/openspec-archive-change/SKILL.md && grep -q "vsdd:gen-decisions" .*/skills/openspec-propose/SKILL.md \
   && pass "decisions steps patched into propose and archive" || fail "decisions steps missing"
+grep -q "Source of Truth drift" .*/skills/openspec-propose/SKILL.md \
+  && pass "propose checks the Source of Truth against the code before copying" || fail "propose drift step missing"
 grep -q "deliberately does" .*/skills/openspec-archive-change/SKILL.md && grep -q "deliberately does" openspec/config.yaml \
   && pass "archive decisions step covers a change that diverges from existing code" || fail "archive decisions step misses divergence"
 grep -q "only restates what existing code" .*/skills/openspec-archive-change/SKILL.md && grep -q "only restates what existing code" openspec/config.yaml \
@@ -190,10 +192,13 @@ rm -rf openspec/changes/vsdd-smoke-test/specs
 step "8b. archive merge (merge_diagrams.py)"
 cp "$SOT" "$ROOT/sot.bak"
 write_change update 1 "$SEC"
+printf '\n## Source of Truth drift\n\n- The diagram showed `OldName`; the code calls it `NewName`.\n' >> "$C"
+python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "a change with a Source of Truth drift section validates" || fail "drift section rejected"
 python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test --dry-run >/dev/null && cmp -s "$SOT" "$ROOT/sot.bak" \
   && pass "dry run writes nothing" || fail "dry run changed files"
 python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test >/dev/null || fail "merge failed"
 grep -q "UI --> CORE" "$SOT" && pass "update merged into architecture" || fail "update not merged"
+! grep -q "Source of Truth drift" "$SOT" && pass "the drift section is never merged" || fail "drift section merged into the Source of Truth"
 grep -q "^## End-to-End Data Flow" "$SOT" && pass "untouched section kept" || fail "untouched section lost"
 [ -f openspec/specs/smoke-cap/diagrams.md ] && grep -q "^## Smoke Flow" openspec/specs/smoke-cap/diagrams.md \
   && pass "add created the capability diagrams file" || fail "add did not create the file"
@@ -323,6 +328,22 @@ else
   echo "  skip  this OpenSpec has no '--tools all'"
 fi
 cd "$ROOT"
+
+step "Source of Truth drift check (validate_mermaid.py)"
+DR="$ROOT/drift-demo"; mkdir -p "$DR/lib" "$DR/openspec/specs/architecture"
+printf 'class FooService {\n  void loadAll() {}\n}\n' > "$DR/lib/foo.dart"
+{ printf '# Architecture Diagrams\n\n## Flow\n\nDemo.\n\n```mermaid\nflowchart TD\n'
+  printf '    A["FooService"] --> B["BarGone"]\n    U["User"] --> A\n```\n\n## Legacy\n\nDemo.\n\n'
+  printf '```mermaid\nsequenceDiagram\n    %%%% vsdd:not-code LegacyThing\n    participant L as LegacyThing\n'
+  printf '    participant F as FooService\n    L->>F: loadAll()\n```\n'; } > "$DR/openspec/specs/architecture/diagrams.md"
+rc=0; OUT="$(python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" 2>&1)" || rc=$?
+[ "$rc" = 0 ] && grep -q "'Flow': BarGone not found in the project's code" <<<"$OUT" \
+  && ! grep -q "FooService not found\|LegacyThing\|User\|loadAll" <<<"$OUT" \
+  && pass "drift check warns about a name the code no longer has, and only that one" || fail "drift check: $OUT"
+rc=0; python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" --names-strict >/dev/null 2>&1 || rc=$?
+[ "$rc" = 1 ] && pass "--names-strict fails on drift" || fail "--names-strict exit $rc"
+OUT="$(python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" --no-names 2>&1)"
+! grep -q "not found in the project" <<<"$OUT" && pass "--no-names skips the drift check" || fail "--no-names still warned"
 
 step "One-shot installer (vsdd_install.py)"
 ROOT5="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-inst.XXXXXX")"

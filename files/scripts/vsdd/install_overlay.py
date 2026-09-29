@@ -49,6 +49,15 @@ GEN_DIAGRAMS = """\
     its new flows go in `specs/<capability>/diagrams.md`. A row that adds or moves a
     diagram into `specs/architecture/diagrams.md` must name, in `Why here`, the
     capabilities it spans.
+  - Before copying, check each Source of Truth section you are about to copy against
+    the code. Run `python3 scripts/vsdd/validate_mermaid.py`: it warns about names in
+    those sections that the code no longer has. Then read the code behind the
+    participants, calls and transitions this change relies on. If a section is stale,
+    still copy it verbatim as the Before (it is what the Source of Truth says), make its
+    After match the code as it really is plus this change, and add a top-level
+    `## Source of Truth drift` section (a list, no `###` headings; never merged): what
+    the diagram says, what the code does. A stale section this change does not touch:
+    list it there and suggest a separate sync change; don't widen this change.
   - Copy the Before sections VERBATIM from the files the rows name, then write the
     After sections under the SAME stable names. Removed diagrams have no After.
 - Read `docs/MERMAID_RULES.md` before drafting any diagram. Then run
