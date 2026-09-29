@@ -10,6 +10,23 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Added
+- Source of Truth drift check. The validator looks up every code-like name in the
+  diagrams under `openspec/specs/` (CamelCase, `snake_case`, or followed by `(`) in
+  the project's source files, and warns about names it cannot find, because they were
+  probably renamed or removed without the diagram. Labels that are not code go on a
+  `%% vsdd:not-code <names>` line in the diagram. `--names-strict` makes drift fail the
+  run (for CI); `--no-names` skips it. It checks names only, not arrows.
+- Propose checks the Source of Truth before copying it. The verbatim check keeps a
+  change's Before in step with the Source of Truth, not with the code, so a drifted
+  diagram used to pass straight into the plan. Propose now checks the sections it
+  copies against the code first. A stale section is still copied verbatim, corrected
+  in the After State, and recorded in a new `## Source of Truth drift` section, which
+  is never merged. Stale sections outside the change are listed there with a
+  suggestion to fix them in a separate sync change. Existing installs get the propose
+  step when the overlay is re-applied; the matching `config.yaml` rule is only written
+  on new installs.
+
 ## [0.3.6] - 2026-09-28
 
 ### Fixed

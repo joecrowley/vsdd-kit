@@ -60,6 +60,15 @@ Pipeline (schema `visual-driven`): `proposal → diagrams → specs → design �
    Nothing else.
 4. **After State.** Write one `### <Stable Name>` for every update, add and move row.
    Keep existing stable names unchanged. A removed diagram has no After section.
+5. **Check the Source of Truth first.** The verbatim check keeps the Before in step
+   with the Source of Truth, not with the code. So before copying, check each section
+   against the code: the validator warns about names the code no longer has, and the
+   code behind the flows the change relies on must still match. If a section has
+   drifted, copy it verbatim anyway (it is the record of what the Source of Truth
+   said), make the After match the real code plus this change, and add a top-level
+   `## Source of Truth drift` section: a list of what the diagram says and what the
+   code does. Like Deviations, it is never merged. A stale section the change does not
+   touch is listed there too, with a suggestion to fix it in a separate sync change.
 
 The validator checks that the Placement table matches the Before and After sections,
 that each Before copy is verbatim, and that architecture-file additions have a
@@ -130,6 +139,14 @@ architecture-file additions give a `Why here`. Ownership warnings are printed as
 `warning:` lines and don't change the exit code.
 
 Run it after editing any `diagrams.md`. CI runs it on every push.
+
+**Source of Truth drift.** For every diagram in `openspec/specs/`, the validator also
+looks up each code-like name (CamelCase, `snake_case`, or followed by `(`) in the
+project's source files, and warns about names it cannot find: they were probably
+renamed or removed without the diagram. A label that is not code (a person, an
+external system) goes on a `%% vsdd:not-code <names>` line inside the diagram.
+`--names-strict` turns these warnings into failures, for CI; `--no-names` skips the
+check. It checks names only, not whether each arrow is still true.
 
 ## 6. Architecture decisions
 
