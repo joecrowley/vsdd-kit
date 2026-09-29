@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-09-29
+
 ### Added
 - Source of Truth drift check. The validator looks up every code-like name in the
   diagrams under `openspec/specs/` (CamelCase, `snake_case`, or followed by `(`) in
@@ -215,7 +217,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.6...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.7...HEAD
+[0.3.7]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.3...v0.3.4
