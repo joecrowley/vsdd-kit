@@ -38,9 +38,10 @@ YES
 
 ## Before State
 
-<!-- Verbatim copy of each `## <Stable Name>` section whose row is update, move or
-     remove, as `### <Stable Name>`. Copy from the file the row names (for a move,
-     from the old file). Nothing else. -->
+<!-- Written by `python3 scripts/vsdd/seed_before.py <change-name>`: a verbatim copy
+     of each `## <Stable Name>` section whose row is update, move or remove, as
+     `### <Stable Name>`, from the file the row names (for a move, the old file).
+     Nothing else. Don't edit it by hand. -->
 
 ## After State
 

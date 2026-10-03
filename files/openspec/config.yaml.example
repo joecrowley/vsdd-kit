@@ -26,22 +26,22 @@ rules:
   diagrams:
     - "Read `docs/VSDD.md` and `docs/MERMAID_RULES.md` before drafting any diagram."
     - "For a YES gate, add a `## Placement` table (Stable name | Source of Truth file | Action: update, add, move from <old file>, remove | Why here). Diagrams belong to the capability whose behaviour they show: when the change creates a capability, its new flows go in specs/<capability>/diagrams.md. A row that adds or moves a diagram into specs/architecture/diagrams.md must say in `Why here` which capabilities it spans."
-    - "Before copying, check each affected Source of Truth section against the code (the validator warns about names the code no longer has; read the code behind the flows the change relies on). If it is stale, copy it verbatim anyway, correct it in the After State, and record what was wrong in a top-level `## Source of Truth drift` section (never merged)."
-    - "Copy the Before State verbatim from the file each Placement row names (for a move, the old file); copy only the affected stable-named sections."
+    - "Write the Before State with python3 scripts/vsdd/seed_before.py <change-name>: it copies the affected stable-named sections verbatim from the file each Placement row names (for a move, the old file) and warns about names the code no longer has. Never edit the Before by hand."
+    - "Check the copied sections against the code (read code only where a name is missing or for a flow the change touches). If one is stale, keep its Before as copied, correct it in the After State, and record what was wrong in a top-level `## Source of Truth drift` section (never merged)."
     - "Keep stable section names unchanged when modifying an existing diagram - the archive merge targets sections by name."
     - "If no visual concern is affected, record NO with a one-line reason and omit Before/After sections."
   design:
     - "Read openspec/specs/architecture/decisions.md first and follow every rule that applies. To break one, write `Overrides: <Stable Name> - <why>` under Decisions."
   tasks:
     - "If the change has no design.md, apply the rules in openspec/specs/architecture/decisions.md to the tasks."
-    - "If diagrams.md has a YES gate, the final task group MUST include: trace the After State against the code and record any Deviations, then run python3 scripts/vsdd/validate_mermaid.py."
+    - "If diagrams.md has a YES gate, the final task group MUST include: trace the After State against the code with python3 scripts/vsdd/validate_mermaid.py --trace <change-name> (it also validates the change), check the names it lists are on the call path, and record any Deviations."
 
 # VSDD backstop: delivered by the CLI to the stock apply/archive skills, so the key
 # diagram steps still happen if `openspec update` has wiped the skill overlay.
 operations:
   apply:
     guidance:
-      - "VSDD: if the change's diagrams.md has a YES gate, before finishing trace every participant, node and edge in its After State against the code. Where the code differs, update the After State to match and add a top-level `## Deviations` section (Proposed / Built / Why)."
+      - "VSDD: if the change's diagrams.md has a YES gate, before finishing trace its After State against the code: run python3 scripts/vsdd/validate_mermaid.py --trace <change-name> (it fails on names no source file contains and lists where the others are), then check they are on the call path. Where the code differs, update the After State to match and add a top-level `## Deviations` section (Proposed / Built / Why)."
   archive:
     guidance:
       - "VSDD: before moving the change to the archive, merge its diagrams.md into the Source of Truth: run python3 scripts/vsdd/merge_diagrams.py <change dir> (with --dry-run first). Without the script, apply every row of its `## Placement` table as described in docs/VSDD.md section 4 (remove, move from <old file>, update, add). Skip if the gate is NO. Never touch sections without a Placement row, and never merge Before State, Placement or Deviations. Run python3 scripts/vsdd/validate_mermaid.py afterwards, and include a Diagrams line in the archive summary."

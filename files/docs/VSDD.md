@@ -55,16 +55,19 @@ Pipeline (schema `visual-driven`): `proposal → diagrams → specs → design �
    | `move from <old file>` | verbatim copy from the **old** file | same stable name | delete from the old file, then add to this file |
    | `remove` | verbatim copy (kept as history) | **none** | delete the section, and the file if no diagrams are left |
 
-3. **Before State.** Copy the `## <Stable Name>` section for every update, move and
-   remove row **verbatim** from the file the row names, as `### <Stable Name>`.
-   Nothing else.
+3. **Before State.** Run `python3 scripts/vsdd/seed_before.py <change-name>` once the
+   Placement table is written. It copies the `## <Stable Name>` section for every
+   update, move and remove row **verbatim** from the file the row names, as
+   `### <Stable Name>`, and nothing else. Don't write or edit the Before by hand:
+   a copy that differs by one character fails the verbatim check.
 4. **After State.** Write one `### <Stable Name>` for every update, add and move row.
    Keep existing stable names unchanged. A removed diagram has no After section.
 5. **Check the Source of Truth first.** The verbatim check keeps the Before in step
-   with the Source of Truth, not with the code. So before copying, check each section
-   against the code: the validator warns about names the code no longer has, and the
-   code behind the flows the change relies on must still match. If a section has
-   drifted, copy it verbatim anyway (it is the record of what the Source of Truth
+   with the Source of Truth, not with the code. So check each copied section against
+   the code: `seed_before.py` warns about names in them that the code no longer has,
+   and the code behind the flows the change relies on must still match (read code only
+   where a name is missing or for a flow the change touches). If a section has
+   drifted, keep its Before as copied (it is the record of what the Source of Truth
    said), make the After match the real code plus this change, and add a top-level
    `## Source of Truth drift` section: a list of what the diagram says and what the
    code does. Like Deviations, it is never merged. A stale section the change does not
@@ -81,6 +84,11 @@ review that row.
 The After State must describe what was actually **built**, because it becomes the
 canonical diagram. When implementation differs from the proposal:
 
+- Find the differences first with
+  `python3 scripts/vsdd/validate_mermaid.py --trace <change-name>`: it fails on every
+  code-like name in the After State that no source file contains, and lists the files
+  that mention the others. What's left to check by reading code is whether those are
+  in the expected place and on the call path.
 - Update the After State to match the code.
 - Add a top-level `## Deviations` section (a sibling of Before/After, and never
   merged) with **Proposed / Built / Why** for each difference.
@@ -99,7 +107,8 @@ python3 scripts/vsdd/merge_diagrams.py openspec/changes/<name>             # app
 The script is the reference implementation of the rules below:
 - It validates the change first. If any Before copy is no longer verbatim (because
   the Source of Truth changed after the change was proposed), it writes nothing and
-  exits 1. Resolve that conflict before archiving.
+  exits 1. Resolve that conflict before archiving: re-copy the Before with
+  `python3 scripts/vsdd/seed_before.py <name>`, then check the After State still fits.
 - Running it again after a merge reports "already merged".
 
 Without the script, apply the rules by hand. If the gate is NO, the merge does
@@ -129,9 +138,17 @@ uses another root or a registered store, the same layout applies under that root
 ## 5. Validation
 
 ```bash
-python3 scripts/vsdd/validate_mermaid.py            # lint + structure
-python3 scripts/vsdd/validate_mermaid.py --render   # also parse with mermaid-cli
+python3 scripts/vsdd/validate_mermaid.py                       # lint + structure, everything
+python3 scripts/vsdd/validate_mermaid.py --render              # also parse with mermaid-cli
+python3 scripts/vsdd/validate_mermaid.py --change <name>       # one change
+python3 scripts/vsdd/validate_mermaid.py --trace <name>        # one change, After State traced against the code
+python3 scripts/vsdd/seed_before.py <name>                     # write a change's Before State
 ```
+
+`--change` checks one change and drift-checks only the Source of Truth sections its
+Placement rows name, so its cost doesn't grow with the rest of `openspec/`. Add
+`--no-names` when the drift was just reported (by `seed_before.py`). `--trace` is the
+apply-time check: see section 3.
 
 For an active change, the validator also checks the `## Placement` table against the
 Before and After sections, that each Before copy is still verbatim, and that

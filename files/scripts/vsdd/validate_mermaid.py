@@ -36,12 +36,22 @@ Ownership warnings (active changes; printed, but they don't fail the run):
   - the change creates a capability (it has specs/<cap>/ and openspec/specs/<cap>/
     doesn't exist yet) and still adds or moves a diagram into the architecture file
 
+One change (--change <name>): that change's diagrams.md, and the drift check limited to
+the Source of Truth sections its Placement rows name.
+
+Trace (--trace <name>, at the end of apply): everything --change does, plus every
+code-like name in the change's After State is looked up in the source files. Names no
+file contains fail the run; the others are listed with the files that mention them, so
+only "is it on the call path?" is left to check by reading code.
+
 Usage:
   python3 scripts/vsdd/validate_mermaid.py                 # openspec/specs + active changes
   python3 scripts/vsdd/validate_mermaid.py --render        # plus mmdc parse
   python3 scripts/vsdd/validate_mermaid.py --include-archive
   python3 scripts/vsdd/validate_mermaid.py --names-strict   # drift in the Source of Truth fails the run
-  python3 scripts/vsdd/validate_mermaid.py path/to/file.md ...
+  python3 scripts/vsdd/validate_mermaid.py --change <name>  # one change (a name or its folder)
+  python3 scripts/vsdd/validate_mermaid.py --trace <name>   # one change + After State traced against the code
+  python3 scripts/vsdd/validate_mermaid.py path/to/file.md ...   # files, or change folders
 
 Exit code 0 = clean, 1 = errors found, 2 = bad invocation.
 """
@@ -119,13 +129,45 @@ def code_names(block: list[str]) -> tuple[set[str], set[str]]:
     return names - exempt, exempt
 
 
-def drift_warnings(lines: list[str], known: set[str]) -> list[tuple[int, str]]:
-    """Names in a Source of Truth diagram that no longer appear in the project's code."""
+def name_locations(root: Path, names: set[str]) -> dict[str, list[str]]:
+    """{name: project-relative source files that mention it} for the given names, walking
+    the same files as source_identifiers. Files that appear to declare the name come
+    first, then other files, then test files."""
+    ranked: dict[str, list[tuple[int, str]]] = {n: [] for n in names}
+    if not names:
+        return {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        rel = Path(dirpath).relative_to(root).parts
+        dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d not in SKIP_DIRS
+                             and not (rel == ("scripts",) and d == "vsdd"))
+        for name in sorted(filenames):
+            if Path(name).suffix in SOURCE_EXTS:
+                path = Path(dirpath) / name
+                try:
+                    text = path.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    continue
+                rel_path = str(path.relative_to(root))
+                is_test = bool(re.search(r"(^|/)(tests?|spec|__tests__)/|_test\.|\.test\.|_spec\.|\.spec\.", rel_path))
+                for n in names & set(IDENT_RE.findall(text)):
+                    declares = re.search(
+                        rf"\b(class|interface|mixin|enum|typedef|struct|trait|protocol|type|def|func|fun|fn|function)\s+{n}\b"
+                        rf"|^[ \t]*(?:[\w<>?,\[\]]+[ \t]+)+{n}[ \t]*(?:<[^>\n]*>)?[ \t]*\((?:[^;\n]*\)[ \t]*(?:async\*?|=>|\{{)|[ \t]*\{{?[ \t]*$)",
+                        text, re.M)
+                    ranked[n].append((0 if declares and not is_test else 2 if is_test else 1, rel_path))
+    return {n: [p for _, p in sorted(v)] for n, v in ranked.items()}
+
+
+def drift_warnings(lines: list[str], known: set[str], only: set[str] | None = None) -> list[tuple[int, str]]:
+    """Names in a Source of Truth diagram that no longer appear in the project's code.
+    With `only`, just the `## <Stable Name>` sections it names."""
     heads = [(ln, n) for n, ln, _ in _sections(lines, "##")]
     blocks, _ = extract_blocks(lines)
     out = []
     for start, block in blocks:
         section = next((n for ln, n in reversed(heads) if ln < start), "?")
+        if only is not None and section not in only:
+            continue
         names, _ = code_names(block)
         missing = sorted(n for n in names if n not in known)
         if missing:
@@ -364,6 +406,77 @@ def already_merged(lines: list[str], root: Path) -> bool:
     return True
 
 
+def change_file(root: Path, arg: str | Path) -> Path:
+    """A change's diagrams.md from a change name, a change folder or the file itself."""
+    p = Path(arg)
+    if not p.exists() and not p.is_absolute():
+        named = root / "openspec" / "changes" / str(arg)
+        p = named if named.exists() else p
+    if p.is_dir():
+        p = p / "diagrams.md"
+    if not p.is_file():
+        raise SystemExit(f"error: no diagrams.md for change '{arg}' (looked for {p})")
+    return p.resolve()
+
+
+def gate_is_yes(lines: list[str]) -> bool:
+    h2 = {n: body for n, _, body in _sections(lines, "##")}
+    gate = next((l for l in h2.get("Diagram needed?", "").splitlines()
+                 if l.strip() and not l.strip().startswith("<!--")), "")
+    m = GATE_RE.match(gate)
+    return bool(m and m.group(1).upper() == "YES")
+
+
+def placement_rows(lines: list[str]) -> list[tuple[str, str, str, str | None]]:
+    """The change's valid Placement rows (invalid rows are reported by the structure check)."""
+    body = next((b for n, _, b in _sections(lines, "##") if n == "Placement"), "")
+    return _parse_placement(body)[0]
+
+
+def after_sections(lines: list[str]) -> list[tuple[str, int, list[str]]]:
+    """(stable name, heading line, lines) for each `### <Stable Name>` under `## After State`."""
+    h2 = [(n, ln) for n, ln, _ in _sections(lines, "##")]
+    start = next((ln for n, ln in h2 if n == "After State"), None)
+    if start is None:
+        return []
+    end = min((ln for _, ln in h2 if ln > start), default=len(lines) + 1)
+    h3 = [(n, ln) for n, ln, _ in _sections(lines, "###") if start < ln < end]
+    out = []
+    for i, (name, ln) in enumerate(h3):
+        stop = h3[i + 1][1] if i + 1 < len(h3) else end
+        out.append((name, ln, lines[ln:stop - 1]))
+    return out
+
+
+def trace_change(path: Path, lines: list[str], root: Path) -> tuple[list[tuple[int, str]], list[str]]:
+    """Look up every code-like name in the change's After State in the project's source
+    files. Returns (problems: names no source file contains, report lines)."""
+    if not gate_is_yes(lines):
+        return [], ["trace: the gate is NO, nothing to trace"]
+    sections = []
+    for name, ln, body in after_sections(lines):
+        names = set()
+        for _, block in extract_blocks(body)[0]:
+            names |= code_names(block)[0]
+        sections.append((name, ln, names))
+    where = name_locations(root, set().union(*(n for _, _, n in sections)) if sections else set())
+    problems, report = [], []
+    for name, ln, names in sections:
+        missing = sorted(n for n in names if not where[n])
+        if missing:
+            problems.append((ln, f"trace '{name}': {', '.join(missing)} not found in any source file. "
+                             "Build it, or update the After State to what was built and record it under "
+                             "## Deviations; label text that is not code goes on a `%% vsdd:not-code` line"))
+        found = sorted(n for n in names if where[n])
+        if found:
+            shown = [f"{n} ({', '.join(where[n][:2])}{f', +{len(where[n]) - 2} more' if len(where[n]) > 2 else ''})"
+                     for n in found]
+            report.append(f"trace '{name}': " + "; ".join(shown))
+        elif not missing:
+            report.append(f"trace '{name}': no code-like names")
+    return problems, report
+
+
 DECISION_FIELDS = ("Rule", "Why", "Source")
 
 
@@ -457,15 +570,31 @@ def main() -> int:
     parser.add_argument("--no-names", action="store_true", help="skip the Source of Truth drift check")
     parser.add_argument("--strict-archive", action="store_true",
                         help="also apply the change-structure checks to archived changes (older ones predate Placement)")
+    parser.add_argument("--change", metavar="NAME",
+                        help="check one change (name or folder) and only the Source of Truth sections its Placement names")
+    parser.add_argument("--trace", metavar="NAME",
+                        help="as --change, then look up every code-like name in its After State in the source files")
     args = parser.parse_args()
 
     root = args.root.resolve()
-    files = [p.resolve() for p in args.paths] if args.paths else find_files(root, args.include_archive)
+    scope: dict[Path, set[str]] | None = None  # Source of Truth file -> sections to drift-check
+    if args.change or args.trace:
+        change = change_file(root, args.change or args.trace)
+        scope = {}
+        for name, target, action, move_from in placement_rows(change.read_text(encoding="utf-8").splitlines()):
+            if action != "add":
+                scope.setdefault((root / "openspec" / (move_from or target)).resolve(), set()).add(name)
+        files = [change] + sorted(p for p in scope if p.is_file())
+    elif args.paths:
+        files = [(p / "diagrams.md" if p.is_dir() else p).resolve() for p in args.paths]
+    else:
+        files = find_files(root, args.include_archive)
     problems: list[tuple[Path, int, str]] = []
     warnings: list[tuple[Path, int, str]] = []
+    report: list[str] = []
     to_render: list[tuple[Path, int, list[str]]] = []
     block_count = 0
-    known, n_sources = (set(), 0) if args.no_names else source_identifiers(root)
+    known, n_sources = (set(), 0) if args.no_names or (scope is not None and not scope) else source_identifiers(root)
 
     for path in files:
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -477,7 +606,8 @@ def main() -> int:
             to_render.append((path, start, block))
         in_specs = "specs" in path.parts and "changes" not in path.parts
         if path.name == "diagrams.md" and in_specs and n_sources:
-            found = [(path, n, msg) for n, msg in drift_warnings(lines, known)]
+            only = scope.get(path) if scope is not None else None
+            found = [(path, n, msg) for n, msg in drift_warnings(lines, known, only)]
             if args.names_strict:
                 problems += found
             else:
@@ -495,6 +625,9 @@ def main() -> int:
                 problems += [(path, n, msg) for n, msg in check_change_structure(path, lines, root, verify_before)]
             if not archived:
                 warnings += [(path, n, msg) for n, msg in ownership_warnings(path, lines, root)]
+            if args.trace and not archived:
+                found, report = trace_change(path, lines, root)
+                problems += [(path, n, msg) for n, msg in found]
 
     if args.render and to_render:
         problems += render_blocks(to_render)
@@ -509,6 +642,8 @@ def main() -> int:
         print(f"{show(path)}:{line}: {msg}")
     for path, line, msg in sorted(warnings, key=lambda p: (str(p[0]), p[1])):
         print(f"{show(path)}:{line}: warning: {msg}")
+    for line in report:
+        print(line)
     status = "FAIL" if problems else "OK"
     print(f"{status}: {len(files)} files, {block_count} mermaid blocks, {len(problems)} problems"
           + (f", {len(warnings)} warnings" if warnings else "")

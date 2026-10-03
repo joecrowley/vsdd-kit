@@ -180,6 +180,7 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 | `scripts/vsdd/validate_mermaid.py` | `scripts/vsdd/validate_mermaid.py` | Overwrite |
 | `scripts/vsdd/install_overlay.py` | `scripts/vsdd/install_overlay.py` | Overwrite |
 | `scripts/vsdd/merge_diagrams.py` | `scripts/vsdd/merge_diagrams.py` | Overwrite |
+| `scripts/vsdd/seed_before.py` | `scripts/vsdd/seed_before.py` | Overwrite |
 | `scripts/vsdd/openspec_preflight.py` | `scripts/vsdd/openspec_preflight.py` | Overwrite |
 | `scripts/vsdd/vsdd_snapshot.py` | `scripts/vsdd/vsdd_snapshot.py` | Overwrite |
 
@@ -187,7 +188,7 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 mkdir -p "$ROOT"/openspec/schemas "$ROOT"/docs "$ROOT"/scripts/vsdd
 cp -R "$KIT"/files/openspec/schemas/visual-driven "$ROOT"/openspec/schemas/
 cp "$KIT"/files/docs/VSDD.md "$ROOT"/docs/
-for f in validate_mermaid install_overlay merge_diagrams openspec_preflight vsdd_snapshot; do
+for f in validate_mermaid install_overlay merge_diagrams seed_before openspec_preflight vsdd_snapshot; do
   cp "$KIT"/files/scripts/vsdd/$f.py "$ROOT"/scripts/vsdd/
 done   # vsdd_install.py stays in the kit
 [ -e "$ROOT"/docs/MERMAID_RULES.md ] || cp "$KIT"/files/docs/MERMAID_RULES.md "$ROOT"/docs/
@@ -427,7 +428,7 @@ Pass the folder to `vsdd_snapshot.py save --extra-dir` too, so a rollback covers
 | Skills or `/opsx` commands (continue, ff, …) disappeared after `openspec update` | They weren't in the global OpenSpec profile | Add them with `openspec config profile`, then run `openspec update` again. Next time, run `openspec_preflight.py` first |
 | A tool's skills were never created | `openspec update` only refreshes tools that are already set up | `openspec init --tools <tool> .` (safe on an existing project) |
 | `openspec archive` used directly | The CLI has no diagram merge | Run `python3 scripts/vsdd/merge_diagrams.py openspec/changes/archive/<dated-name>` (see `docs/VSDD.md` §4) |
-| `merge_diagrams.py` refuses: "not a verbatim copy" | The Source of Truth changed after the change was proposed (e.g. another change archived first) | Re-copy the Before sections from the current Source of Truth, re-check that the After State still makes sense, then merge again |
+| `merge_diagrams.py` refuses: "not a verbatim copy" | The Source of Truth changed after the change was proposed (e.g. another change archived first) | Re-copy the Before sections from the current Source of Truth (`python3 scripts/vsdd/seed_before.py <name>`), re-check that the After State still makes sense, then merge again |
 
 ## Roll back an install
 

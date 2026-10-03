@@ -87,7 +87,7 @@ python3 scripts/vsdd/install_overlay.py >/dev/null
 [ "$before" = "$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)" ] && pass "overlay idempotent" || fail "overlay not idempotent"
 grep -q "vsdd:wrapper" .*/command*/opsx*archive* .*/commands/opsx/archive.md 2>/dev/null && pass "commands wrapped" || fail "commands not wrapped"
 SK="$(ls .*/skills/openspec-apply-change/SKILL.md | head -1)"
-sed -i.bak 's/trace `## After State`/trace the old `## After State`/' "$SK" && rm -f "$SK.bak"
+sed -i.bak 's/re-read its `## After State`/re-read the old `## After State`/' "$SK" && rm -f "$SK.bak"
 grep -q "overlay stale" <<<"$(python3 scripts/vsdd/install_overlay.py --check 2>&1 || true)" && pass "--check reports a block from an older kit as stale" || fail "stale block not detected"
 python3 scripts/vsdd/install_overlay.py >/dev/null && python3 scripts/vsdd/install_overlay.py --check >/dev/null && ! grep -q "the old" "$SK" \
   && pass "re-running the overlay refreshes a changed block (kit upgrade)" || fail "changed block not refreshed"
@@ -176,6 +176,22 @@ printf '## Diagram needed?\n\nmaybe\n' > "$C"
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && fail "bad gate not caught" || pass "bad gate caught"
 printf '## Diagram needed?\n\nNO - smoke test\n' > "$C"
 python3 scripts/vsdd/validate_mermaid.py >/dev/null && pass "NO gate passes" || fail "NO gate rejected"
+# seed_before.py writes the Before State from the Placement table
+write_change update 1 "IGNORED"
+sed -i.bak '/^## Before State$/,/^## After State$/{/^## After State$/!d;}' "$C" && rm -f "$C.bak"
+python3 scripts/vsdd/seed_before.py vsdd-smoke-test --dry-run >/dev/null && ! grep -q "^## Before State" "$C" \
+  && pass "seed_before --dry-run writes nothing" || fail "seed_before --dry-run changed the change"
+python3 scripts/vsdd/seed_before.py vsdd-smoke-test >/dev/null && python3 scripts/vsdd/validate_mermaid.py >/dev/null \
+  && [ "$(grep -n '^## Before State' "$C" | cut -d: -f1)" -lt "$(grep -n '^## After State' "$C" | cut -d: -f1)" ] \
+  && pass "seed_before adds a verbatim Before State before the After State" || fail "seeded Before rejected"
+write_change update 1 "$(printf '%s\n' "$SEC" | sed 's/^Dependency direction/Dependency-direction/')"
+python3 scripts/vsdd/seed_before.py openspec/changes/vsdd-smoke-test >/dev/null && python3 scripts/vsdd/validate_mermaid.py >/dev/null \
+  && pass "seed_before replaces a hand-edited Before (change given as a folder)" || fail "seed_before did not fix a non-verbatim Before"
+python3 scripts/vsdd/validate_mermaid.py --change vsdd-smoke-test >/dev/null && python3 scripts/vsdd/validate_mermaid.py openspec/changes/vsdd-smoke-test >/dev/null \
+  && pass "validator takes one change by name (--change) or folder" || fail "validator rejects --change or a change folder"
+write_change update 1 "$SEC"; sed -i.bak 's/^| Module Hierarchy | specs\/architecture/| No Such Section | specs\/architecture/' "$C" && rm -f "$C.bak"
+rc=0; python3 scripts/vsdd/seed_before.py vsdd-smoke-test >/dev/null 2>&1 || rc=$?
+[ "$rc" = 1 ] && pass "seed_before refuses a row whose section the Source of Truth lacks (exit 1)" || fail "seed_before missing section: exit $rc"
 write_owner() {  # $1 = Why here text ('' = none): the change creates smoke-cap but adds its flow to architecture
   mkdir -p openspec/changes/vsdd-smoke-test/specs/smoke-cap
   printf '## Diagram needed?\n\nYES - ownership\n\n## Placement\n\n| Stable name | Source of Truth file | Action | Why here |\n|---|---|---|---|\n'  > "$C"
@@ -344,6 +360,25 @@ rc=0; python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" --names
 [ "$rc" = 1 ] && pass "--names-strict fails on drift" || fail "--names-strict exit $rc"
 OUT="$(python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" --no-names 2>&1)"
 ! grep -q "not found in the project" <<<"$OUT" && pass "--no-names skips the drift check" || fail "--no-names still warned"
+DC="$DR/openspec/changes/demo"; mkdir -p "$DC"
+write_demo() {  # $1 = stable name to update; its After names FooService, loadAll and BazNew
+  { printf '## Diagram needed?\n\nYES - demo\n\n## Placement\n\n| Stable name | Source of Truth file | Action |\n|---|---|---|\n'
+    printf '| %s | specs/architecture/diagrams.md | update |\n\n## After State\n\n### %s\n\nDemo.\n\n' "$1" "$1"
+    printf '```mermaid\nsequenceDiagram\n    participant F as FooService\n    F->>F: loadAll()\n    F->>F: refreshBaz()\n```\n'; } > "$DC/diagrams.md"
+  python3 "$KIT/files/scripts/vsdd/seed_before.py" --root "$DR" demo 2>&1
+}
+OUT="$(write_demo Legacy)"
+! grep -q "drift" <<<"$OUT" && OUT2="$(python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" --change demo 2>&1)" \
+  && ! grep -q "BarGone" <<<"$OUT2" && pass "--change and seed_before drift-check only the sections the change copies" || fail "drift not scoped: $OUT $OUT2"
+OUT="$(write_demo Flow)"
+grep -q "drift in 'Flow'.*BarGone" <<<"$OUT" && pass "seed_before reports drift in a section it copies" || fail "seed_before drift: $OUT"
+rc=0; OUT="$(python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" --trace demo 2>&1)" || rc=$?
+[ "$rc" = 1 ] && grep -q "trace 'Flow': refreshBaz not found in any source file" <<<"$OUT" \
+  && grep -q "FooService (lib/foo.dart)" <<<"$OUT" && grep -q "loadAll (lib/foo.dart)" <<<"$OUT" \
+  && pass "--trace fails on an After name no source has and lists where the others are" || fail "--trace: rc=$rc $OUT"
+printf 'class FooService {\n  void loadAll() {}\n  void refreshBaz() {}\n}\n' > "$DR/lib/foo.dart"
+python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" --trace demo --no-names >/dev/null \
+  && pass "--trace passes once the code has every name" || fail "--trace still fails"
 
 step "One-shot installer (vsdd_install.py)"
 ROOT5="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-inst.XXXXXX")"
