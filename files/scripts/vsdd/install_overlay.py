@@ -68,7 +68,7 @@ GEN_DIAGRAMS = """\
 """
 
 GUARD = """\
-> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. <!-- vsdd:guard -->"""
+> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. The scripts in `scripts/vsdd/` are tools: run them as the steps say and act on what they print (`--help` lists their options); don't read their source. <!-- vsdd:guard -->"""
 FRONTMATTER_END = "<frontmatter-end>"  # anchor: the line after the closing `---` of the YAML front matter
 
 GEN_DECISIONS = """\
