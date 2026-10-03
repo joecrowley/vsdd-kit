@@ -10,6 +10,15 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Changed
+- Agents are told to treat the scripts in `scripts/vsdd/` as tools: run them as the steps
+  say and act on what they print (`--help` lists their options), without reading their
+  source. In a test run with 0.3.8, the propose session read `validate_mermaid.py` twice
+  and `seed_before.py` once to find out what they do, which cost turns and context. The
+  line is in the guard every patched skill carries, so existing installs get it when the
+  overlay is re-applied, and in the `AGENTS.md` section, which re-running the installer
+  refreshes.
+
 ## [0.3.8] - 2026-10-03
 
 ### Added

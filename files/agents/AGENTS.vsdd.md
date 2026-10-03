@@ -13,5 +13,7 @@
 | Designing a change, or fixing a bug that could recur elsewhere | `openspec/specs/architecture/decisions.md` (rules learned from past changes) |
 
 - After editing any diagram, run `python3 scripts/vsdd/validate_mermaid.py`.
+- The scripts in `scripts/vsdd/` are tools: run them and act on what they print (`--help` lists
+  their options). Don't read their source.
 - After `openspec init` or `openspec update`, run `python3 scripts/vsdd/install_overlay.py`,
   because those commands overwrite the VSDD skill additions.
