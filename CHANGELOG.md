@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.9] - 2026-10-03
+
 ### Changed
 - Agents are told to treat the scripts in `scripts/vsdd/` as tools: run them as the steps
   say and act on what they print (`--help` lists their options), without reading their
@@ -253,7 +255,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.8...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.9...HEAD
+[0.3.9]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.5...v0.3.6
