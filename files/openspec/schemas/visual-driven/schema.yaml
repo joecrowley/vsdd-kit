@@ -81,23 +81,25 @@ artifacts:
 
 
       Step 4 - Write the delta:
-      - First check each Source of Truth section you will copy against the code:
-      `python3 scripts/vsdd/validate_mermaid.py` warns about names the code no
-      longer has, and the code behind the participants, calls and transitions
-      this change relies on must still match. If a section is stale, copy it
-      verbatim anyway, make its After match the real code plus this change, and
-      add a top-level `## Source of Truth drift` section (a list, never merged)
-      saying what the diagram says and what the code does. List stale sections
-      this change does not touch there too, and suggest a separate sync change.
-      - `## Before State`: for every update, move and remove row, copy the
-      `## <Stable Name>` section VERBATIM from the file the row names (for a
-      move, from the old file) as `### <Stable Name>`. Nothing else.
+      - `## Before State`: run `python3 scripts/vsdd/seed_before.py <change-name>`.
+      It copies the `## <Stable Name>` section of every update, move and remove
+      row VERBATIM from the file the row names (for a move, the old file) as
+      `### <Stable Name>`, and warns about names in those sections that the code
+      no longer has. Never write or edit the Before by hand.
+      - Check the copied sections against the code: the code behind the
+      participants, calls and transitions this change relies on must still match.
+      Read code only where a name is missing or for a flow the change touches. If
+      a section is stale, keep its Before as copied, make its After match the real
+      code plus this change, and add a top-level `## Source of Truth drift`
+      section (a list, never merged) saying what the diagram says and what the
+      code does. List stale sections this change does not touch there too, and
+      suggest a separate sync change.
       - `## After State`: one `### <Stable Name>` per update, add and move row.
       Keep existing stable names unchanged. Removed diagrams have no After
       section.
-      - Run `python3 scripts/vsdd/validate_mermaid.py`: it checks the Placement
-      table against the Before/After sections and that Before copies are
-      verbatim.
+      - Run `python3 scripts/vsdd/validate_mermaid.py --change <change-name> --no-names`:
+      it checks the Placement table against the Before/After sections and that
+      the Before copies are verbatim.
 
 
       Rules:
@@ -324,6 +326,8 @@ apply:
     Read context files, work through pending tasks, mark complete as you go.
     Pause if you hit blockers or need clarification.
     VSDD: if diagrams.md records a YES gate, before declaring the change complete
-    trace every participant, node and edge in its After State against the final
-    code. Where the code differs, update the After State to match the code and add
-    a top-level `## Deviations` section (Proposed / Built / Why).
+    trace its After State against the final code: run
+    `python3 scripts/vsdd/validate_mermaid.py --trace <change-name>`, which fails on
+    names no source file contains and lists where the others are, then check that
+    they are on the call path. Where the code differs, update the After State to
+    match the code and add a top-level `## Deviations` section (Proposed / Built / Why).

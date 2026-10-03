@@ -49,20 +49,22 @@ GEN_DIAGRAMS = """\
     its new flows go in `specs/<capability>/diagrams.md`. A row that adds or moves a
     diagram into `specs/architecture/diagrams.md` must name, in `Why here`, the
     capabilities it spans.
-  - Before copying, check each Source of Truth section you are about to copy against
-    the code. Run `python3 scripts/vsdd/validate_mermaid.py`: it warns about names in
-    those sections that the code no longer has. Then read the code behind the
-    participants, calls and transitions this change relies on. If a section is stale,
-    still copy it verbatim as the Before (it is what the Source of Truth says), make its
-    After match the code as it really is plus this change, and add a top-level
+  - Run `python3 scripts/vsdd/seed_before.py <change-name>`: it writes
+    `## Before State`, copying every update, move and remove section verbatim from the
+    file its row names, and warns about names in those sections that the code no
+    longer has. Never write or edit the Before by hand.
+  - Check those sections against the code: look up the names behind the
+    participants, calls and transitions this change relies on, and read code only
+    where a name is missing or for a flow the change touches. If a section is stale,
+    keep its Before as copied (it is what the Source of Truth says), make its After
+    match the code as it really is plus this change, and add a top-level
     `## Source of Truth drift` section (a list, no `###` headings; never merged): what
     the diagram says, what the code does. A stale section this change does not touch:
     list it there and suggest a separate sync change; don't widen this change.
-  - Copy the Before sections VERBATIM from the files the rows name, then write the
-    After sections under the SAME stable names. Removed diagrams have no After.
+  - Write the After sections under the SAME stable names. Removed diagrams have no After.
 - Read `docs/MERMAID_RULES.md` before drafting any diagram. Then run
-  `python3 scripts/vsdd/validate_mermaid.py`: it checks the Placement table and
-  that the Before copies are verbatim.
+  `python3 scripts/vsdd/validate_mermaid.py --change <change-name> --no-names`: it
+  checks the Placement table and that the Before copies are verbatim.
 """
 
 GUARD = """\
@@ -92,11 +94,15 @@ APPLY_TRACE = """\
 6a. **Verify diagrams match the final code (VSDD)**
 
    If the change has a `diagrams.md` whose `## Diagram needed?` gate is YES,
-   re-read it before declaring the work complete and trace `## After State`
+   re-read its `## After State` before declaring the work complete and trace it
    against the final code:
-   - For every participant, node and edge, confirm the named class or function
-     exists, is in the expected package or module (search for it), and is
-     actually on the call path.
+   - Run `python3 scripts/vsdd/validate_mermaid.py --trace <change-name>`. It
+     validates the change and looks up every code-like name in the After State:
+     it fails on names no source file contains, and lists the files that mention
+     the others. Don't search for those names yourself.
+   - For the listed names, check what the script can't: that each is in the
+     expected package or module and actually on the call path, opening the
+     listed files only where you need to.
    - If the implementation deviated from the proposed After State: update the
      After State to match the code, and add a top-level `## Deviations` section
      recording **Proposed / Built / Why**. Never keep a parallel "expected" diagram.
@@ -111,8 +117,10 @@ VERIFY_FIDELITY = """\
 <!-- vsdd:verify-fidelity -->
    **Diagram Fidelity (VSDD)**:
    - If `diagrams.md` exists and its `## Diagram needed?` gate is YES:
-     - Treat the code as the source of truth. Trace every participant, node and
-       edge in `## After State` to a real class or call in the expected package.
+     - Treat the code as the source of truth. Run
+       `python3 scripts/vsdd/validate_mermaid.py --trace <change-name>` for the names
+       no source file contains, then check that each participant, node and edge in
+       `## After State` is a real class or call in the expected package.
      - Missing or misplaced symbol:
        - Add WARNING: "Diagram does not match code: <participant/edge>"
        - Recommendation: "Update the After State to match the implementation, or fix the code"

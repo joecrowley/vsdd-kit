@@ -10,6 +10,31 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Added
+- `scripts/vsdd/seed_before.py <change>` writes a change's `## Before State` from its
+  Placement table, copying each update, move and remove section verbatim from the
+  Source of Truth, and reports drift in exactly the sections it copied. Propose now
+  runs it instead of having the agent copy the sections by hand, which cost output
+  tokens and a fix-and-revalidate round whenever a copy wasn't exact. Also
+  `vsdd-kit seed` for `--tooling-dir` installs.
+- `validate_mermaid.py --trace <change>`, the apply-time trace as a script: it
+  validates the change and looks up every code-like name in its After State in the
+  source files, fails on names no file contains, and lists the files that mention the
+  others, the one that declares the name first. Apply's trace step and verify's diagram-fidelity check run it instead of
+  searching for each name, leaving only "is it on the call path?" to read code for.
+- `validate_mermaid.py --change <name>` checks one change, and drift-checks only the
+  Source of Truth sections its Placement rows name, so the run doesn't grow with the
+  rest of `openspec/` and doesn't pull the agent into unrelated drift. A change folder
+  can now be passed as a path too.
+
+### Changed
+- Propose and apply instructions (overlay, schema, `config.yaml.example`, `VSDD.md`):
+  propose seeds the Before with the script, reads code only where a name is missing or
+  for a flow the change touches, and closes with `--change <name> --no-names` (the
+  drift was just reported by the seed). The final task group and apply's trace run
+  `--trace <name>` once. Existing installs get the skill steps when the overlay is
+  re-applied; the changed `config.yaml` rules are only written on new installs.
+
 ## [0.3.7] - 2026-09-29
 
 ### Added

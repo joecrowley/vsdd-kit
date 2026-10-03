@@ -82,7 +82,7 @@ KIT_FILES = HERE.parent.parent
 KIT_VERSION = (KIT_FILES.parent / "VERSION").read_text(encoding="utf-8").strip() \
     if (KIT_FILES.parent / "VERSION").is_file() else "unknown"
 STAMP = Path("openspec") / ".vsdd.json"
-SCRIPTS = ("validate_mermaid.py", "install_overlay.py", "merge_diagrams.py",
+SCRIPTS = ("validate_mermaid.py", "install_overlay.py", "merge_diagrams.py", "seed_before.py",
            "openspec_preflight.py", "vsdd_snapshot.py")
 SECTION = "## OpenSpec & Visual Spec-Driven Development"
 POINTER_MARK = "vsdd:pointer"
