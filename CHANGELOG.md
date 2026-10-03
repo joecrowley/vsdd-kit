@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.8] - 2026-10-03
+
 ### Added
 - `scripts/vsdd/seed_before.py <change>` writes a change's `## Before State` from its
   Placement table, copying each update, move and remove section verbatim from the
@@ -242,7 +244,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.7...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.6...v0.3.7
 [0.3.6]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.4...v0.3.5
