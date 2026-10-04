@@ -86,6 +86,9 @@ before="$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)"
 python3 scripts/vsdd/install_overlay.py >/dev/null
 [ "$before" = "$(cat .*/skills/openspec-archive-change/SKILL.md | cksum)" ] && pass "overlay idempotent" || fail "overlay not idempotent"
 grep -q "vsdd:wrapper" .*/command*/opsx*archive* .*/commands/opsx/archive.md 2>/dev/null && pass "commands wrapped" || fail "commands not wrapped"
+grep -q "vsdd:explore-diagrams" .*/skills/openspec-explore/SKILL.md && grep -q "vsdd:explore-capture" .*/skills/openspec-explore/SKILL.md \
+  && grep -lq "vsdd:wrapper" .*/command*/opsx*explore* .*/commands/opsx/explore.md 2>/dev/null \
+  && pass "explore reads the Source of Truth diagrams, and /opsx explore loads the skill" || fail "explore not patched or not wrapped"
 SK="$(ls .*/skills/openspec-apply-change/SKILL.md | head -1)"
 sed -i.bak 's/re-read its `## After State`/re-read the old `## After State`/' "$SK" && rm -f "$SK.bak"
 grep -q "overlay stale" <<<"$(python3 scripts/vsdd/install_overlay.py --check 2>&1 || true)" && pass "--check reports a block from an older kit as stale" || fail "stale block not detected"

@@ -74,8 +74,8 @@ exact for the installed CLI version:
 ```bash
 ls "$ROOT"/openspec/schemas/visual-driven 2>/dev/null
 grep -rl "vsdd:" "$ROOT"/.*/skills/openspec-*/SKILL.md 2>/dev/null | head -3
-# only the skills VSDD patches: the stock explore skill mentions diagrams on its own
-ls "$ROOT"/.*/skills/openspec-{propose,continue-change,ff-change,update-change,apply-change,verify-change,archive-change,bulk-archive-change}/SKILL.md 2>/dev/null \
+# only the skills VSDD patches
+ls "$ROOT"/.*/skills/openspec-{explore,propose,continue-change,ff-change,update-change,apply-change,verify-change,archive-change,bulk-archive-change}/SKILL.md 2>/dev/null \
   | xargs grep -Li "vsdd:" 2>/dev/null | xargs grep -li "diagram" 2>/dev/null | head -3
 ```
 
@@ -316,7 +316,8 @@ The overlay handles every OpenSpec tool layout:
 
 What it does, for every tool folder (`.claude`, `.opencode`, `.qwen`, ...):
 
-- Inserts marked VSDD blocks into whichever of these skills exist: `openspec-propose`,
+- Inserts marked VSDD blocks into whichever of these skills exist: `openspec-explore`
+  (start from the Source of Truth diagrams; flow changes go to the change's `diagrams.md`), `openspec-propose`,
   `-continue-change`, `-ff-change` (diagram generation), `-update-change` (rules for
   revising `diagrams.md`), `-apply-change` (trace the After state against the code),
   `-verify-change` (Diagram Fidelity), `-archive-change` (merge into the Source of

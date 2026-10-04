@@ -86,6 +86,25 @@ GEN_DECISIONS_LEGACY = """\
   under Decisions in design.md. <!-- vsdd:gen-decisions -->
 """
 
+EXPLORE_DIAGRAMS = """\
+<!-- vsdd:explore-diagrams -->
+**VSDD - diagrams.** If the project has `openspec/specs/**/diagrams.md`, read the
+`## <Stable Name>` sections that cover the area you are exploring: capability diagrams
+sit next to that capability's spec, cross-cutting ones in
+`specs/architecture/diagrams.md`. Read only the sections you need. Start from them
+instead of reconstructing the flow from the code, and point out where the code no
+longer matches a diagram: `python3 scripts/vsdd/validate_mermaid.py` warns about names
+they show that the code no longer has.
+"""
+
+EXPLORE_CAPTURE = """\
+   <!-- vsdd:explore-capture -->
+   VSDD: a flow, state machine or structure that changes belongs in the change's
+   `diagrams.md`. Don't draw it from here: note the change in the proposal or design,
+   and let `/opsx-propose` (or `/opsx-continue`) add the Placement row, copy the Before
+   State with `seed_before.py` and draw the After.
+"""
+
 PROPOSE_LIST = """\
 - diagrams.md (visual-driven schema: Before/After diagram delta, after the proposal) <!-- vsdd:propose-list -->"""
 
@@ -249,6 +268,10 @@ PATCHES: dict[str, list[Patch]] = {
         Patch("gen-decisions", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DECISIONS, legacy=GEN_DECISIONS_LEGACY),
         Patch("gen-diagrams", (r"^\*\*Artifact Creation Guidelines\*\*\s*$",), "after", GEN_DIAGRAMS),
     ],
+    "openspec-explore": [
+        Patch("explore-diagrams", (r"^### When no change exists",), "before", EXPLORE_DIAGRAMS),
+        Patch("explore-capture", (r"^\s*Example offers:",), "before", EXPLORE_CAPTURE),
+    ],
     "openspec-update-change": [
         Patch("update-guardrail", (r"^\*\*Guardrails\*\*\s*$",), "after", UPDATE_GUARDRAIL),
     ],
@@ -283,6 +306,7 @@ COMMANDS = {
     "verify": "openspec-verify-change",
     "archive": "openspec-archive-change",
     "bulk-archive": "openspec-bulk-archive-change",
+    "explore": "openspec-explore",
 }
 
 WRAPPER_MARK = "<!-- vsdd:wrapper -->"
