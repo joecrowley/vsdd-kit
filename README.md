@@ -122,14 +122,14 @@ On macOS, `python3` may be a stub that asks to install the Xcode command-line to
 Then open your project in your AI coding tool and say:
 
 > Install VSDD into this project: run
-> `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.9 vsdd-kit guide`
+> `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.10 vsdd-kit guide`
 > and follow the runbook it prints. `KIT` is the folder printed by
-> `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.9 vsdd-kit path`.
+> `uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.10 vsdd-kit path`.
 
 This needs [uv](https://docs.astral.sh/uv/) (see Requirements). `uvx` runs the kit from
 that release tag without cloning it or installing anything for good. It brings its own
 Python for the kit, but not for your project: you still need `python3`. `pipx run --spec
-git+https://github.com/joecrowley/vsdd-kit@v0.3.9 vsdd-kit ...` works too.
+git+https://github.com/joecrowley/vsdd-kit@v0.3.10 vsdd-kit ...` works too.
 
 **Or clone it**, which you need for the kit-in-your-workspace setup
 (`--tooling-dir`, below) and for working on the kit:
@@ -153,7 +153,7 @@ decision is yours, and changes nothing until you've answered. You can also run i
 yourself:
 
 ```bash
-uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.9 vsdd-kit install --root . --tools claude --dry-run
+uvx --from git+https://github.com/joecrowley/vsdd-kit@v0.3.10 vsdd-kit install --root . --tools claude --dry-run
 python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --tools claude --dry-run   # from a clone
 ```
 
