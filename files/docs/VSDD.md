@@ -4,8 +4,10 @@ Diagrams are code. They follow the same delta discipline as OpenSpec text specs:
 the current state lives in a Source of Truth, a change proposes a Before/After
 delta, and archiving merges the After state back.
 
-Read this file when you create or edit a change's `diagrams.md`, when you design a
-change (§6), or when you archive a change. Read `docs/MERMAID_RULES.md` before drawing any diagram.
+This is the reference for the workflow. The `/opsx` skills and the schema instructions
+carry the steps each stage needs, so an agent following them doesn't need to read this
+first: read it for a case they don't cover, a manual merge (§4), or when editing diagrams
+outside the `/opsx` steps. `docs/MERMAID_RULES.md` has the Mermaid rules with examples.
 
 **Modes.** A change is full or light, by the schema it was created with:
 

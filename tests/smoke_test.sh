@@ -190,6 +190,8 @@ python3 scripts/vsdd/seed_before.py vsdd-smoke-test >/dev/null && python3 script
 write_change update 1 "$(printf '%s\n' "$SEC" | sed 's/^Dependency direction/Dependency-direction/')"
 python3 scripts/vsdd/seed_before.py openspec/changes/vsdd-smoke-test >/dev/null && python3 scripts/vsdd/validate_mermaid.py >/dev/null \
   && pass "seed_before replaces a hand-edited Before (change given as a folder)" || fail "seed_before did not fix a non-verbatim Before"
+python3 scripts/vsdd/seed_before.py vsdd-smoke-test | grep -q "^next: under ## After State write ### " \
+  && pass "seed_before names the After sections to write next" || fail "seed_before next-step line"
 python3 scripts/vsdd/validate_mermaid.py --change vsdd-smoke-test >/dev/null && python3 scripts/vsdd/validate_mermaid.py openspec/changes/vsdd-smoke-test >/dev/null \
   && pass "validator takes one change by name (--change) or folder" || fail "validator rejects --change or a change folder"
 write_change update 1 "$SEC"; sed -i.bak 's/^| Module Hierarchy | specs\/architecture/| No Such Section | specs\/architecture/' "$C" && rm -f "$C.bak"
@@ -476,6 +478,13 @@ OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && grep -q "^
   && grep -q "light mode kept" <<<"$OUT" && grep -q "3 config check: rules reach" <<<"$OUT" \
   && pass "re-running the installer keeps a light default (config check still passes)" || fail "installer reset the light default: $(grep '^schema' openspec/config.yaml)"
 $MODE full >/dev/null && grep -q "^schema: visual-driven$" openspec/config.yaml && pass "vsdd_mode.py full restores full mode" || fail "vsdd_mode.py full"
+git reset -q --hard "$LIGHT_BASE"; git clean -qfd
+# Upgrade from a kit that told agents to read both docs before any diagram
+sed -i.bak 's|^    - "Mermaid: quote.*$|    - "Read `docs/VSDD.md` and `docs/MERMAID_RULES.md` before drafting any diagram."|' openspec/config.yaml && rm -f openspec/config.yaml.bak
+git add -A; git -c user.email=s@t -c user.name=smoke commit -qm old-rule
+OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && ! grep -q "before drafting any diagram" openspec/config.yaml \
+  && grep -q '^    - "Mermaid: quote' openspec/config.yaml && grep -q "doc-reading rule replaced" <<<"$OUT" && grep -q "3 config check: rules reach" <<<"$OUT" \
+  && pass "upgrade replaces the old read-both-docs rule with the inline Mermaid rules" || fail "old diagrams rule kept: $(grep -n 'drafting\|Mermaid: quote' openspec/config.yaml | cut -c1-80)"
 git reset -q --hard "$LIGHT_BASE"; git clean -qfd
 ROOT8="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-again.XXXXXX")"
 cd "$ROOT8"; git init -q -b main; echo "# again" > README.md; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base

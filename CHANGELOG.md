@@ -10,6 +10,20 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Changed
+- Fewer agent turns per change. In the Flash-Next runs, full mode took 10-30 more
+  turns per phase than plain SDD, and every turn re-sends the whole context. Some of
+  those turns went on reading `docs/VSDD.md` (up to 14 KB) and `docs/MERMAID_RULES.md`
+  before drawing, and on `--help` calls. The diagrams instruction, the light-mode apply
+  instruction and the propose and apply overlay blocks now carry what those reads
+  supplied: the Mermaid rules, the Placement path convention and the section format. The
+  docs are references for cases the steps don't cover, not required reading. The
+  AGENTS.md table, the update and archive overlay blocks, the template comments and the
+  skills' guard line say so too. `seed_before.py` names the After sections to write
+  next. An upgrade replaces the old "read both docs before any diagram" rule in
+  `rules.diagrams` with the inline Mermaid rules. Untested with agents so far: the
+  saving is an estimate from the logs, not a measurement.
+
 ## [0.3.13] - 2026-10-04
 
 ### Added
