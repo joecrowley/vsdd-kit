@@ -10,6 +10,23 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Added
+- Explore uses the diagrams. The overlay now patches the `openspec-explore` skill: when
+  the project has Source of Truth diagrams, explore reads the sections that cover the
+  area being explored and starts from them instead of reconstructing the flow from the
+  code, and points out where the code no longer matches (the validator's drift
+  warnings). A flow that changes is noted for the change's `diagrams.md`, which
+  `/opsx-propose` writes, instead of being drawn during explore. `/opsx explore` is now
+  a wrapper that loads the skill, like the other `/opsx` commands: the stock command
+  carries its own copy of the skill text, so a patch to the skill alone never reached
+  it. Explore also gets the guard line. Existing installs get all of this when the
+  overlay is re-applied.
+
+### Fixed
+- The installer's "hand-edited skill" stop looks for `diagrams.md` or Mermaid instead of
+  the word "diagram", which the stock explore skill uses for ASCII sketches. Without
+  this, a `--custom-schema keep` install stopped on the unpatched explore skill.
+
 ## [0.3.9] - 2026-10-03
 
 ### Changed

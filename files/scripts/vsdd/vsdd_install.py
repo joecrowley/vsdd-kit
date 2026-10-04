@@ -332,7 +332,8 @@ class Installer:
             for name in PATCHES:
                 for skill in tool.glob(f"**/{name}/SKILL.md"):
                     text = skill.read_text(encoding="utf-8", errors="replace")
-                    if "diagram" in text.lower() and "vsdd:" not in text:
+                    # diagrams.md / Mermaid, not "diagram": stock explore talks about ASCII diagrams
+                    if re.search(r"diagrams\.md|mermaid", text, re.I) and "vsdd:" not in text:
                         out.append(str(skill.relative_to(self.root)))
         return out
 
