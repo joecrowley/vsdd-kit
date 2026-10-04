@@ -181,6 +181,7 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 | `scripts/vsdd/install_overlay.py` | `scripts/vsdd/install_overlay.py` | Overwrite |
 | `scripts/vsdd/merge_diagrams.py` | `scripts/vsdd/merge_diagrams.py` | Overwrite |
 | `scripts/vsdd/seed_before.py` | `scripts/vsdd/seed_before.py` | Overwrite |
+| `scripts/vsdd/catalog_diagrams.py` | `scripts/vsdd/catalog_diagrams.py` | Overwrite |
 | `scripts/vsdd/openspec_preflight.py` | `scripts/vsdd/openspec_preflight.py` | Overwrite |
 | `scripts/vsdd/vsdd_snapshot.py` | `scripts/vsdd/vsdd_snapshot.py` | Overwrite |
 
@@ -188,7 +189,7 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 mkdir -p "$ROOT"/openspec/schemas "$ROOT"/docs "$ROOT"/scripts/vsdd
 cp -R "$KIT"/files/openspec/schemas/visual-driven "$ROOT"/openspec/schemas/
 cp "$KIT"/files/docs/VSDD.md "$ROOT"/docs/
-for f in validate_mermaid install_overlay merge_diagrams seed_before openspec_preflight vsdd_snapshot; do
+for f in validate_mermaid install_overlay merge_diagrams seed_before catalog_diagrams openspec_preflight vsdd_snapshot; do
   cp "$KIT"/files/scripts/vsdd/$f.py "$ROOT"/scripts/vsdd/
 done   # vsdd_install.py stays in the kit
 [ -e "$ROOT"/docs/MERMAID_RULES.md ] || cp "$KIT"/files/docs/MERMAID_RULES.md "$ROOT"/docs/

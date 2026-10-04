@@ -13,6 +13,7 @@ everything SETUP.md says about a script applies to its subcommand:
   overlay    files/scripts/vsdd/install_overlay.py    (pass --root <project>)
   merge      files/scripts/vsdd/merge_diagrams.py     (pass --root <project>)
   seed       files/scripts/vsdd/seed_before.py        (pass --root <project>)
+  catalog    files/scripts/vsdd/catalog_diagrams.py   (pass --root <project>)
   guide      print SETUP.md (--reference: docs/SETUP-REFERENCE.md)
   path       print the kit folder: use it as KIT in SETUP.md
 
@@ -44,6 +45,7 @@ COMMANDS = {
     "overlay": ("install_overlay.py", []),
     "merge": ("merge_diagrams.py", []),
     "seed": ("seed_before.py", []),
+    "catalog": ("catalog_diagrams.py", []),
 }
 
 
