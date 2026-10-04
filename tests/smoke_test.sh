@@ -332,8 +332,8 @@ if HOME="$FH" XDG_CONFIG_HOME="$FH/.config" CODEX_HOME="$FH/.codex" openspec ini
   HOME="$FH" python3 "$KIT/files/scripts/vsdd/install_overlay.py" --extra-dir "$FH/.minimax" >/dev/null || fail "overlay (all tools)"
   HOME="$FH" python3 "$KIT/files/scripts/vsdd/install_overlay.py" --check --extra-dir "$FH/.minimax" >/dev/null \
     && pass "overlay --check passes for every tool (incl. home-folder MiniMax)" || fail "overlay --check (all tools)"
-  # The 8 commands whose skills VSDD patches (explore/sync/new/onboard stay stock).
-  WRAPPED_RE='(opsx-|/opsx/)(propose|continue|ff|update|apply|verify|archive|bulk-archive)\.(md|prompt\.md|prompt|toml)$'
+  # The 9 commands whose skills VSDD patches (sync/new/onboard stay stock).
+  WRAPPED_RE='(opsx-|/opsx/)(propose|continue|ff|update|apply|verify|archive|bulk-archive|explore)\.(md|prompt\.md|prompt|toml)$'
   CMDS=$(find . -path ./.git -prune -o -type f -print | grep -E "$WRAPPED_RE")
   NCMD=$(printf '%s\n' "$CMDS" | grep -c . || true)
   UNWRAPPED=0

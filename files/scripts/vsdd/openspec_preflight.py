@@ -41,7 +41,7 @@ from pathlib import Path
 
 SKIP_DIRS = {".git", "node_modules", ".dart_tool", "build", ".venv", "venv"}
 STOCK_SCHEMAS = {"spec-driven", "visual-driven"}
-# OpenSpec tool id -> project folders it writes (measured with OpenSpec 1.13.2 by running
+# OpenSpec tool id -> project folders it writes (measured with OpenSpec 1.14.0 by running
 # `openspec init --tools <id>` for every tool). Several tools share `.agents`.
 # HOME_TOOLS write outside the project instead.
 TOOL_DIRS: dict[str, tuple[str, ...]] = {
@@ -58,6 +58,10 @@ TOOL_DIRS: dict[str, tuple[str, ...]] = {
     "codeassistant": (".codeassistant",), "qoder": (".qoder",), "qwen": (".qwen",),
     "rovodev": (".rovodev",), "roocode": (".roo",), "trae": (".trae",), "zed": (".agents",),
     "zcode": (".zcode",), "agents": (".agents",),
+    # added in OpenSpec 1.14.0
+    "amp": (".agents",), "atomcode": (".atomcode",), "codestudio": (".codestudio",),
+    "dsh": (".dsh",), "easycode": (".easycode",), "gigacode": (".gigacode",),
+    "grok": (".grok",), "gsd": (".agents",), "veai": (".veai",), "warp": (".warp",),
 }
 HOME_TOOLS: dict[str, str] = {"minimax-code": "~/.minimax"}
 # Skills and commands VSDD patches (the rest, e.g. explore and sync, stay stock).
