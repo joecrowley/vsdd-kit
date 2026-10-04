@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.13] - 2026-10-04
+
 ### Added
 - Light mode. A second schema, `visual-driven-light`, plans no diagrams at propose
   (`proposal → specs → design → tasks`); the last apply task writes `diagrams.md` from
@@ -21,8 +23,11 @@ command that `status` prints.
   schema: propose skips diagrams.md in light mode and can create a change in either mode
   on request, apply writes the diagrams in light mode, verify warns when a light change
   has none, and archive stops instead of archiving a light change without diagrams. The
-  installer copies both schemas and keeps a light default on upgrade. Light mode is
-  untested with agents so far: it is meant to cut VSDD's cost per change, not yet shown to.
+  installer copies both schemas and keeps a light default on upgrade. Tested with
+  agents once so far (one change, Qwen3.8 Flash-Next): 55.0 min and 11/12 hidden tests,
+  against 47.5 / 54.2 min for plain SDD and 58.8 / 68.3 min for full mode, and a
+  `diagrams.md` that passed the validator and matched the code where checked. One run
+  is not enough to say light mode is cheaper than full mode.
 
 ## [0.3.12] - 2026-10-04
 
@@ -314,7 +319,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.12...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.13...HEAD
+[0.3.13]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.12...v0.3.13
 [0.3.12]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.9...v0.3.10
