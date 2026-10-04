@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.11] - 2026-10-04
+
 ### Fixed
 - OpenSpec 1.14.0 support. It adds 10 tools (Amp, AtomCode, Code Studio, DeepSeek
   Harness, EasyCode, GigaCode, Grok Build, GSD, Veai, Warp). The preflight did not know
@@ -283,7 +285,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.10...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.11...HEAD
+[0.3.11]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.7...v0.3.8
