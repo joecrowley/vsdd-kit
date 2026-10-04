@@ -355,23 +355,24 @@ vsdd-kit/
 ## Compatibility
 
 VSDD works with any tool OpenSpec supports, because it builds on the skills and
-commands OpenSpec generates for that tool. With OpenSpec 1.13.2, all **40** tools
+commands OpenSpec generates for that tool. With OpenSpec 1.14.0, all **50** tools
 were checked by running `openspec init --tools <tool>` for each one, then the kit:
 
 | Level | Tools |
 |---|---|
 | **Used end to end** (install → propose → apply → verify → archive) | Claude Code |
 | **Overlay applied, `--check` passes, commands wrapped, run in `smoke_test.sh`** | Claude Code, OpenCode, Qwen Code |
-| **Structurally verified** (skills patched, every `/opsx` command wrapped in its own format, preflight recognises the folders) | All 40: Amazon Q, Antigravity, Auggie, Bob, Claude Code, Cline, Command Code, CodeArts, Codex, Devin/Windsurf, ForgeCode, CodeBuddy, Continue, CoStrict, Crush, Cursor, Factory, Gemini CLI, GitHub Copilot, Hermes, iFlow, Junie, Kilo Code, Kimi, Kiro, Lingma, MiniMax, Mistral Vibe, Oh My Pi, OpenCode, Pi, SourceCraft Code Assistant, Qoder, Qwen Code, Rovo Dev, Roo, Trae, Zed, ZCode, and the generic `agents` target |
+| **Structurally verified** (skills patched, every `/opsx` command wrapped in its own format, preflight recognises the folders) | All 50: Amazon Q, Amp, Antigravity, AtomCode, Auggie, Bob, Claude Code, Cline, Code Studio, Command Code, CodeArts, Codex, DeepSeek Harness, Devin/Windsurf, EasyCode, ForgeCode, CodeBuddy, Continue, CoStrict, Crush, Cursor, Factory, Gemini CLI, GigaCode, GitHub Copilot, Grok Build, GSD, Hermes, iFlow, Junie, Kilo Code, Kimi, Kiro, Lingma, MiniMax, Mistral Vibe, Oh My Pi, OpenCode, Pi, SourceCraft Code Assistant, Qoder, Qwen Code, Rovo Dev, Roo, Trae, Veai, Warp, Zed, ZCode, and the generic `agents` target |
 
 Details worth knowing:
 
-- **Codex, Antigravity, Zed and `agents`** share `.agents/skills/`. Codex uses skills
+- **Codex, Antigravity, Amp, GSD, Zed and `agents`** share `.agents/skills/`. Codex uses skills
   only, so it has no `/opsx` commands.
 - **Kilo Code and Cline** keep commands in a separate folder (`.kilo/`,
   `.clinerules/`). The wrappers point at the tool's own patched skills.
 - **Several tools have skills but no command adapter** in OpenSpec (CodeArts,
-  ForgeCode, Hermes, Kimi, MiniMax, Mistral Vibe, Rovo Dev, Zed, `agents`): use
+  DeepSeek Harness, ForgeCode, Grok Build, Hermes, Kimi, MiniMax, Mistral Vibe, Rovo Dev,
+  Veai, Warp, Zed, `agents`): use
   the skills directly.
 - **MiniMax installs its skills in your home folder** (`~/.minimax`), not in the
   project. The installer asks first, then patches and snapshots it with

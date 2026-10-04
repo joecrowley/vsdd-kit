@@ -10,6 +10,15 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Fixed
+- OpenSpec 1.14.0 support. It adds 10 tools (Amp, AtomCode, Code Studio, DeepSeek
+  Harness, EasyCode, GigaCode, Grok Build, GSD, Veai, Warp). The preflight did not know
+  the eight with their own folders, labelled them "not an OpenSpec tool folder", and
+  the smoke test failed on that. The tool list is re-measured with 1.14.0; every tool
+  that was already listed writes the same folders as before, and the overlay needed no
+  change. The README compatibility table lists all 50 tools. The smoke test's wrapper
+  check now includes `/opsx explore`, which 0.3.10 wraps.
+
 ## [0.3.10] - 2026-10-04
 
 ### Added
