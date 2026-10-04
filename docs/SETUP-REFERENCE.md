@@ -174,7 +174,7 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 
 | From `KIT/files/` | To `ROOT/` | If it exists |
 |---|---|---|
-| `openspec/schemas/visual-driven/` (whole dir) | `openspec/schemas/visual-driven/` | Overwrite. It belongs to the kit |
+| `openspec/schemas/visual-driven/` and `visual-driven-light/` (whole dirs) | `openspec/schemas/` | Overwrite. They belong to the kit |
 | `docs/MERMAID_RULES.md` | `docs/MERMAID_RULES.md` | Diff first. Keep any project-specific rules the user added, and merge in kit additions |
 | `docs/VSDD.md` | `docs/VSDD.md` | Overwrite. It belongs to the kit |
 | `scripts/vsdd/validate_mermaid.py` | `scripts/vsdd/validate_mermaid.py` | Overwrite |
@@ -182,14 +182,15 @@ Copy each file below. **Existing files:** follow the "If it exists" column.
 | `scripts/vsdd/merge_diagrams.py` | `scripts/vsdd/merge_diagrams.py` | Overwrite |
 | `scripts/vsdd/seed_before.py` | `scripts/vsdd/seed_before.py` | Overwrite |
 | `scripts/vsdd/catalog_diagrams.py` | `scripts/vsdd/catalog_diagrams.py` | Overwrite |
+| `scripts/vsdd/vsdd_mode.py` | `scripts/vsdd/vsdd_mode.py` | Overwrite |
 | `scripts/vsdd/openspec_preflight.py` | `scripts/vsdd/openspec_preflight.py` | Overwrite |
 | `scripts/vsdd/vsdd_snapshot.py` | `scripts/vsdd/vsdd_snapshot.py` | Overwrite |
 
 ```bash
 mkdir -p "$ROOT"/openspec/schemas "$ROOT"/docs "$ROOT"/scripts/vsdd
-cp -R "$KIT"/files/openspec/schemas/visual-driven "$ROOT"/openspec/schemas/
+cp -R "$KIT"/files/openspec/schemas/visual-driven "$KIT"/files/openspec/schemas/visual-driven-light "$ROOT"/openspec/schemas/
 cp "$KIT"/files/docs/VSDD.md "$ROOT"/docs/
-for f in validate_mermaid install_overlay merge_diagrams seed_before catalog_diagrams openspec_preflight vsdd_snapshot; do
+for f in validate_mermaid install_overlay merge_diagrams seed_before catalog_diagrams vsdd_mode openspec_preflight vsdd_snapshot; do
   cp "$KIT"/files/scripts/vsdd/$f.py "$ROOT"/scripts/vsdd/
 done   # vsdd_install.py stays in the kit
 [ -e "$ROOT"/docs/MERMAID_RULES.md ] || cp "$KIT"/files/docs/MERMAID_RULES.md "$ROOT"/docs/
@@ -203,6 +204,7 @@ The schema, the overlay and the snippets all refer to `docs/VSDD.md` and
 
 ```bash
 cd "$ROOT" && openspec schema validate visual-driven    # "Schema 'visual-driven' is valid"
+openspec schema validate visual-driven-light             # light mode
 openspec schemas | grep visual-driven
 ```
 
@@ -221,7 +223,7 @@ as a backstop that re-states the diagram steps if the skill overlay is ever wipe
   that as "no config". Replace it with `KIT/files/openspec/config.yaml.example`, then
   fill in `context:` as [`SETUP.md`](../SETUP.md#write-the-project-context) describes.
 - **`config.yaml` exists:**
-  1. Set `schema: visual-driven`, **unless the preflight flagged a custom schema.**
+  1. Set `schema: visual-driven` (or keep `visual-driven-light` if the project already uses light mode), **unless the preflight flagged a custom schema.**
      In that case, **ASK**:
      - **(a)** switch to `visual-driven`, losing the custom artifacts from new
        changes; or
@@ -414,7 +416,7 @@ Pass the folder to `vsdd_snapshot.py save --extra-dir` too, so a rollback covers
 | Symptom | Cause | Fix |
 |---|---|---|
 | `openspec instructions diagrams` shows no `<rules>` | `config.yaml` uses `prompts:` or has a YAML indentation error | Use `rules:`. Check with `python3 -c "import yaml;print(yaml.safe_load(open('openspec/config.yaml')))"` |
-| Change created without `diagrams.md` | Change made with a different schema | `cat openspec/changes/<name>/.openspec.yaml` should show `schema: visual-driven`. Check `schema:` in `config.yaml` |
+| Change created without `diagrams.md` | Light mode (expected: the last apply task writes it), or a change made with a different schema | `cat openspec/changes/<name>/.openspec.yaml`: `visual-driven-light` is light mode; otherwise it should show `schema: visual-driven`. Check `schema:` in `config.yaml` (`python3 scripts/vsdd/vsdd_mode.py`) |
 | `/opsx:propose` (or another `/opsx` command) is unknown right after the install | The agent loaded its commands and skills when the session started, before the install created them | Start a new session, or reload the tool. The commands are in the tool's folder (for Claude Code, `.claude/commands/opsx/`) |
 | `openspec new change` prints `with schema 'spec-driven'`, then `Schema: visual-driven` | The first line is the CLI's built-in default, printed before it reads `config.yaml` | Nothing to fix if `openspec/changes/<name>/.openspec.yaml` shows `schema: visual-driven` |
 | Archive summary has no `Diagrams:` line | Stock command or skill used (overlay wiped) | `install_overlay.py --check`, then re-apply |
@@ -469,7 +471,7 @@ installing:
 
 1. Set `schema: spec-driven` in `openspec/config.yaml`, and delete the `rules.diagrams` entries.
 2. `openspec update --force` to restore stock skills and commands.
-3. Delete `openspec/schemas/visual-driven/`, `docs/VSDD.md`, `scripts/vsdd/`,
+3. Delete `openspec/schemas/visual-driven/` and `visual-driven-light/`, `docs/VSDD.md`, `scripts/vsdd/`,
    `.github/workflows/vsdd.yml`, and the VSDD section of `AGENTS.md`.
 4. Keep `openspec/specs/**/diagrams.md` and the archived changes. They are still
    useful documentation.

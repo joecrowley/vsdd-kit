@@ -14,6 +14,7 @@ everything SETUP.md says about a script applies to its subcommand:
   merge      files/scripts/vsdd/merge_diagrams.py     (pass --root <project>)
   seed       files/scripts/vsdd/seed_before.py        (pass --root <project>)
   catalog    files/scripts/vsdd/catalog_diagrams.py   (pass --root <project>)
+  mode       files/scripts/vsdd/vsdd_mode.py          (pass --root <project>)
   guide      print SETUP.md (--reference: docs/SETUP-REFERENCE.md)
   path       print the kit folder: use it as KIT in SETUP.md
 
@@ -46,6 +47,7 @@ COMMANDS = {
     "merge": ("merge_diagrams.py", []),
     "seed": ("seed_before.py", []),
     "catalog": ("catalog_diagrams.py", []),
+    "mode": ("vsdd_mode.py", []),
 }
 
 

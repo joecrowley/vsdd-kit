@@ -162,7 +162,7 @@ python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --tools claude --
 | `install` | `files/scripts/vsdd/vsdd_install.py` |
 | `status` | `vsdd_install.py --status`: is a project's install behind this kit? |
 | `preflight`, `snapshot` | `openspec_preflight.py`, `vsdd_snapshot.py` |
-| `validate`, `overlay`, `merge`, `seed`, `catalog` | `validate_mermaid.py`, `install_overlay.py`, `merge_diagrams.py`, `seed_before.py`, `catalog_diagrams.py`, with `--root <project>`: for projects installed with `--tooling-dir`, which hold no copy (the CI template uses them) |
+| `validate`, `overlay`, `merge`, `seed`, `catalog`, `mode` | `validate_mermaid.py`, `install_overlay.py`, `merge_diagrams.py`, `seed_before.py`, `catalog_diagrams.py`, `vsdd_mode.py`, with `--root <project>`: for projects installed with `--tooling-dir`, which hold no copy (the CI template uses them) |
 | `guide` (`--reference`) | prints `SETUP.md` (`docs/SETUP-REFERENCE.md`) |
 | `path` | the kit folder inside the package: use it as `KIT` |
 
@@ -192,6 +192,14 @@ python3 ~/vsdd-kit/files/scripts/vsdd/vsdd_install.py --root . --tools claude --
 Command names vary by tool (`/opsx:apply` in Claude Code, `/opsx-apply` in OpenCode
 and Qwen).
 
+That is **full mode**. In **light mode** propose writes no diagrams; the last apply task
+draws `diagrams.md` from the code as built, and you review it before archiving. It skips
+the planning and the plan-versus-code reconciliation, at the price of not seeing a
+diagram of the design before the code is written. Switch the project default with
+`python3 scripts/vsdd/vsdd_mode.py light` (or `full`; no argument shows the mode of the
+project and of each change), or ask for one change "in light mode" when proposing it.
+Details: `docs/VSDD.md`, Modes.
+
 ```bash
 python3 scripts/vsdd/validate_mermaid.py            # lint + change structure
 python3 scripts/vsdd/validate_mermaid.py --render   # also render with mermaid-cli
@@ -206,8 +214,8 @@ uvx --from git+https://github.com/joecrowley/vsdd-kit vsdd-kit status --root .  
 
 | In your project | Purpose |
 |---|---|
-| `openspec/schemas/visual-driven/` | Schema and templates: `proposal → diagrams → specs → design → tasks` |
-| `openspec/config.yaml` | `schema: visual-driven`, your project `context`, and per-artifact `rules` |
+| `openspec/schemas/visual-driven/`, `visual-driven-light/` | Schemas and templates: full mode `proposal → diagrams → specs → design → tasks`; light mode `proposal → specs → design → tasks`, diagrams at the end of apply |
+| `openspec/config.yaml` | `schema: visual-driven` (or `visual-driven-light`: the default mode), your project `context`, and per-artifact `rules` |
 | `openspec/specs/**/diagrams.md` | The **Source of Truth**: one `## <Stable Name>` section per diagram |
 | `docs/VSDD.md` | Standards for agents: gate, Before/After, Deviations, merge |
 | `docs/MERMAID_RULES.md` | Syntax guardrails that keep LLM-written diagrams parseable |
@@ -215,7 +223,7 @@ uvx --from git+https://github.com/joecrowley/vsdd-kit vsdd-kit status --root .  
 | `.<tool>/skills/openspec-*` | Stock OpenSpec skills with the VSDD steps inserted, each marked `<!-- vsdd:… -->` |
 | `openspec/config.yaml` `operations` | The key VSDD steps, repeated as CLI guidance (newer OpenSpec) |
 | `.<tool>/command*/opsx-*` | Thin wrappers that load those skills |
-| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before; `--trace` checks a change's After State against the code), `seed_before.py` (copies a change's Before State from the Source of Truth), `merge_diagrams.py` (the archive merge, deterministic), `catalog_diagrams.py` (writes `docs/DIAGRAMS.md`, every diagram on one page with links to its spec and code), `install_overlay.py`, `openspec_preflight.py` (what `openspec update` would delete, tools to add), `vsdd_snapshot.py` (saves and restores what git can't). The installer, `vsdd_install.py`, runs from the kit and isn't copied |
+| `scripts/vsdd/` | `validate_mermaid.py` (lint, structure, verbatim Before; `--trace` checks a change's After State against the code), `seed_before.py` (copies a change's Before State from the Source of Truth), `merge_diagrams.py` (the archive merge, deterministic), `catalog_diagrams.py` (writes `docs/DIAGRAMS.md`, every diagram on one page with links to its spec and code), `vsdd_mode.py` (shows or sets full or light mode), `install_overlay.py`, `openspec_preflight.py` (what `openspec update` would delete, tools to add), `vsdd_snapshot.py` (saves and restores what git can't). The installer, `vsdd_install.py`, runs from the kit and isn't copied |
 | `openspec/.vsdd.json` | Which kit version installed VSDD, with the tools and folders it used. `--status` and upgrades read it |
 | `.github/workflows/vsdd.yml` | CI: render every diagram and check the overlay (optional). Works after a `--tooling-dir` install too, by running the recorded kit release with `uvx` |
 
@@ -349,7 +357,7 @@ vsdd-kit/
     ├── openspec/                ← schema, templates, config example, Source of Truth skeleton
     ├── docs/                    ← VSDD.md, MERMAID_RULES.md
     ├── agents/                  ← AGENTS.md section, CLAUDE.md example
-    ├── scripts/vsdd/            ← install_overlay.py, validate_mermaid.py, seed_before.py, merge_diagrams.py, catalog_diagrams.py, openspec_preflight.py, vsdd_snapshot.py
+    ├── scripts/vsdd/            ← install_overlay.py, validate_mermaid.py, seed_before.py, merge_diagrams.py, catalog_diagrams.py, vsdd_mode.py, openspec_preflight.py, vsdd_snapshot.py
     └── ci/github/vsdd.yml       ← GitHub Actions workflow
 ```
 
