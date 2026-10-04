@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.14] - 2026-10-04
+
 ### Changed
 - Fewer agent turns per change. In the Flash-Next runs, full mode took 10-30 more
   turns per phase than plain SDD, and every turn re-sends the whole context. Some of
@@ -333,7 +335,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.13...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.14...HEAD
+[0.3.14]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.13...v0.3.14
 [0.3.13]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.12...v0.3.13
 [0.3.12]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.10...v0.3.11
