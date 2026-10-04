@@ -10,6 +10,19 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Added
+- A one-page diagram catalogue. `scripts/vsdd/catalog_diagrams.py` writes
+  `docs/DIAGRAMS.md`: every Source of Truth diagram, architecture first, each with its
+  prose and Mermaid block, the capability's spec Purpose, links to the spec and
+  `diagrams.md`, a link to the source file that declares each name it shows (where
+  exactly one file does; names no file has are marked), the other diagrams that show the
+  same names, and an index of shared names. It is generated and needs no model; an
+  overview written between `<!-- vsdd:overview -->` markers is kept between runs, and the
+  AGENTS.md section tells agents how to write one when asked. The installer writes the
+  page when the project already has diagrams, the archive step refreshes it after the
+  merge, `--check` and a validator warning report when it is out of date, and
+  `vsdd-kit catalog` runs it for `--tooling-dir` installs.
+
 ## [0.3.11] - 2026-10-04
 
 ### Fixed

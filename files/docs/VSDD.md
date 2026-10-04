@@ -25,6 +25,14 @@ change (§6), or when you archive a change. Read `docs/MERMAID_RULES.md` before 
   file) needs a reason in the Placement table's `Why here` column, saying which
   capabilities it spans. The validator enforces this, and warns when the change
   creates a capability but still adds to the architecture file.
+- **One page of everything:** `docs/DIAGRAMS.md` collects every Source of Truth
+  diagram, architecture first, each with its prose, links to its capability's spec and
+  `diagrams.md`, the source file that declares each name it shows, and the other diagrams
+  that show the same names. It is generated - edit the `diagrams.md` files, never the
+  page - by `python3 scripts/vsdd/catalog_diagrams.py`, which the archive step runs after
+  the merge. The only hand-written part is an overview between `<!-- vsdd:overview -->`
+  and `<!-- /vsdd:overview -->`, which regenerating keeps. The validator warns when the
+  page is older than the diagrams.
 
 ## 2. The change artifact: `diagrams.md`
 
@@ -125,7 +133,8 @@ then updates and additions:
 Rules for every action:
 - Never touch a section that has no Placement row.
 - Never merge `## Before State`, `## Placement` or `## Deviations`.
-- Afterwards, run the validator on the changed Source of Truth files.
+- Afterwards, run the validator on the changed Source of Truth files, then
+  `python3 scripts/vsdd/catalog_diagrams.py` to refresh `docs/DIAGRAMS.md`.
 
 The merge is done by the `openspec-archive-change` skill, not by the
 `openspec archive` CLI. Always archive through the skill or the `/opsx` archive

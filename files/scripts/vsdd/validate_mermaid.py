@@ -32,6 +32,9 @@ Decisions log (openspec/specs/**/decisions.md):
   - every `## <Stable Name>` entry has **Rule:**, **Why:** and **Source:** lines
   - warning: a Source that isn't a dated archive folder name (2026-01-15-fix-x) or `install`
 
+Catalogue (warning): docs/DIAGRAMS.md, if the project has one, was generated from the
+current diagrams and specs (catalog_diagrams.py records a hash of them).
+
 Ownership warnings (active changes; printed, but they don't fail the run):
   - the change creates a capability (it has specs/<cap>/ and openspec/specs/<cap>/
     doesn't exist yet) and still adds or moves a diagram into the architecture file
@@ -133,6 +136,12 @@ def name_locations(root: Path, names: set[str]) -> dict[str, list[str]]:
     """{name: project-relative source files that mention it} for the given names, walking
     the same files as source_identifiers. Files that appear to declare the name come
     first, then other files, then test files."""
+    return {n: [p for _, p in v] for n, v in ranked_locations(root, names).items()}
+
+
+def ranked_locations(root: Path, names: set[str]) -> dict[str, list[tuple[int, str]]]:
+    """As name_locations, with each file's rank: 0 = appears to declare the name (not a
+    test), 1 = mentions it, 2 = a test file."""
     ranked: dict[str, list[tuple[int, str]]] = {n: [] for n in names}
     if not names:
         return {}
@@ -155,7 +164,7 @@ def name_locations(root: Path, names: set[str]) -> dict[str, list[str]]:
                         rf"|^[ \t]*(?:[\w<>?,\[\]]+[ \t]+)+{n}[ \t]*(?:<[^>\n]*>)?[ \t]*\((?:[^;\n]*\)[ \t]*(?:async\*?|=>|\{{)|[ \t]*\{{?[ \t]*$)",
                         text, re.M)
                     ranked[n].append((0 if declares and not is_test else 2 if is_test else 1, rel_path))
-    return {n: [p for _, p in sorted(v)] for n, v in ranked.items()}
+    return {n: sorted(v) for n, v in ranked.items()}
 
 
 def drift_warnings(lines: list[str], known: set[str], only: set[str] | None = None) -> list[tuple[int, str]]:
@@ -631,6 +640,15 @@ def main() -> int:
 
     if args.render and to_render:
         problems += render_blocks(to_render)
+    if scope is None and not args.paths:
+        # The one-page catalogue (catalog_diagrams.py), if the project has one.
+        try:
+            from catalog_diagrams import DEFAULT_OUT, stale
+        except ImportError:
+            stale = None
+        if stale is not None and stale(root, root / DEFAULT_OUT):
+            warnings.append((root / DEFAULT_OUT, 1, "out of date: the diagrams or specs changed since it was "
+                             "generated - run python3 scripts/vsdd/catalog_diagrams.py"))
 
     def show(path: Path) -> Path:
         try:

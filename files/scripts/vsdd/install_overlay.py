@@ -180,6 +180,9 @@ ARCHIVE_SYNC = """\
      `## Placement` or `## Deviations`.
    - If `scripts/vsdd/validate_mermaid.py` exists, run it and fix any errors
      before moving the change.
+   - If `scripts/vsdd/catalog_diagrams.py` exists, run it to refresh
+     `docs/DIAGRAMS.md`, the one-page catalogue of every diagram (it keeps the page's
+     overview block).
    - Show which sections were replaced, appended, moved or removed, and include a
      `**Diagrams:**` line in the final summary.
 """

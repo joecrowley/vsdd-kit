@@ -30,6 +30,9 @@ flowchart TD
     SKILLS -->|"archive: applies the Placement rows"| MERGE["merge_diagrams.py"]
     MERGE -.->|"imports: validates before writing"| VAL
     MERGE -->|"writes"| SOT[("Source of Truth - openspec/specs/**/diagrams.md")]
+    SKILLS -->|"archive: refreshes the one-page catalogue"| CAT["catalog_diagrams.py"]
+    CAT -->|"reads"| SOT
+    CAT -.->|"imports: parsers, name lookup"| VAL
     SNAP -->|"restore: rollback of untracked files and global config"| PROJ["project"]
 ```
 
@@ -43,7 +46,8 @@ flowchart TD
 | `validate_mermaid.py` | Mermaid lint, change structure (Placement, verbatim Before, ownership), decisions log, and Source of Truth drift (names in `openspec/specs` diagrams that the project's source no longer has; warnings, or failures with `--names-strict`). Skips the verbatim-Before check for a change that is already merged (`already_merged`, shared with the merge). `--render` parses with mermaid-cli. `--change <name>` checks one change and drift-checks only the sections its Placement names; `--trace <name>` adds a lookup of every code-like name in the change's After State (the apply-time trace) | The patched skills, CI, you |
 | `seed_before.py` | Writes a change's `## Before State` from its Placement table, copying each section verbatim from the Source of Truth, and reports drift for the sections it copied. Imports the parsers from `validate_mermaid.py` | The patched propose skill |
 | `merge_diagrams.py` | The archive merge: applies Placement rows (remove, move, update, add), refuses if the Source of Truth changed. Imports the structure checks and `already_merged` from `validate_mermaid.py` | The patched archive skill |
-| `vsdd_kit/cli.py` | The `vsdd-kit` command when the kit is installed as a package: runs the scripts above by name (`install`, `status`, `validate`, `overlay`, `merge`, `seed`, ...), prints the guides, and `path` names the kit folder inside the package. The wheel holds the kit in the repository's layout (`pyproject.toml`) | You, or the agent, via `uvx` / `pipx` |
+| `catalog_diagrams.py` | Writes `docs/DIAGRAMS.md`: every Source of Truth diagram on one page, with the spec's Purpose, links to the spec and `diagrams.md`, the file that declares each name, and the diagrams that share names. Keeps the hand-written overview block, records a hash of its inputs; `--check`, and a validator warning, report when it is out of date. Imports the parsers and `ranked_locations` from `validate_mermaid.py` | The patched archive skill, you |
+| `vsdd_kit/cli.py` | The `vsdd-kit` command when the kit is installed as a package: runs the scripts above by name (`install`, `status`, `validate`, `overlay`, `merge`, `seed`, `catalog`, ...), prints the guides, and `path` names the kit folder inside the package. The wheel holds the kit in the repository's layout (`pyproject.toml`) | You, or the agent, via `uvx` / `pipx` |
 | `vsdd_snapshot.py` | Saves and restores what git can't: untracked install files and the global OpenSpec config | The installer (save), you (restore) |
 
 ## Where the pieces end up

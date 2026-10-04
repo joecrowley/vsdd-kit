@@ -383,6 +383,32 @@ printf 'class FooService {\n  void loadAll() {}\n  void refreshBaz() {}\n}\n' > 
 python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" --trace demo --no-names >/dev/null \
   && pass "--trace passes once the code has every name" || fail "--trace still fails"
 
+step "Diagram catalogue (catalog_diagrams.py)"
+CAT="$KIT/files/scripts/vsdd/catalog_diagrams.py"; P="$DR/docs/DIAGRAMS.md"
+mkdir -p "$DR/openspec/specs/foo-loading"
+printf '# Foo Loading\n\n## Purpose\n\nLoads every foo for the screen.\n\n## Requirements\n' > "$DR/openspec/specs/foo-loading/spec.md"
+printf '# Foo Loading Diagrams\n\n## Load Flow\n\nHow foos load.\n\n```mermaid\nsequenceDiagram\n    participant F as FooService\n    F->>F: loadAll()\n```\n' \
+  > "$DR/openspec/specs/foo-loading/diagrams.md"
+python3 "$CAT" --root "$DR" >/dev/null && [ -f "$P" ] && pass "catalogue written to docs/DIAGRAMS.md" || fail "catalogue not written"
+grep -q '^### Load Flow' "$P" && grep -q '^### Flow' "$P" && grep -q 'Loads every foo for the screen' "$P" \
+  && grep -q '\[spec.md\](../openspec/specs/foo-loading/spec.md)' "$P" \
+  && [ "$(grep -n '^## Architecture Diagrams' "$P" | cut -d: -f1)" -lt "$(grep -n '^## Foo Loading Diagrams' "$P" | cut -d: -f1)" ] \
+  && pass "catalogue: every section, architecture first, spec purpose and links" || fail "catalogue content"
+grep -q '\[`FooService`\](../lib/foo.dart)' "$P" && grep -q '`BarGone` (not found in the code)' "$P" && ! grep -q 'LegacyThing`' "$P" \
+  && pass "catalogue links names to the declaring file and marks drift" || fail "catalogue code links"
+grep -q 'Also shown in.*\[Load Flow\]' "$P" && grep -q '^| `FooService` |' "$P" \
+  && pass "catalogue cross-links diagrams that share a name" || fail "catalogue cross-links"
+python3 "$CAT" --root "$DR" --check >/dev/null && python3 "$CAT" --root "$DR" | grep -q "unchanged" \
+  && pass "catalogue --check passes and a re-run changes nothing" || fail "catalogue not stable"
+sed -i.bak 's/<!-- vsdd:overview -->/<!-- vsdd:overview -->\nSmoke overview./' "$P" && rm -f "$P.bak"
+sed -i.bak 's/How foos load./How foos load, edited./' "$DR/openspec/specs/foo-loading/diagrams.md" && rm -f "$DR/openspec/specs/foo-loading/diagrams.md.bak"
+rc=0; python3 "$CAT" --root "$DR" --check >/dev/null || rc=$?
+OUT="$(python3 "$KIT/files/scripts/vsdd/validate_mermaid.py" --root "$DR" 2>&1)"
+[ "$rc" = 1 ] && grep -q "DIAGRAMS.md:1: warning: out of date" <<<"$OUT" \
+  && pass "a changed diagram makes the catalogue out of date (--check, validator warning)" || fail "stale catalogue not reported: rc=$rc $OUT"
+python3 "$CAT" --root "$DR" >/dev/null && grep -q "^Smoke overview.$" "$P" && grep -q "How foos load, edited" "$P" \
+  && pass "regenerating keeps the overview block" || fail "overview lost on regenerate"
+
 step "One-shot installer (vsdd_install.py)"
 ROOT5="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-inst.XXXXXX")"
 IH="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-ihome.XXXXXX")"

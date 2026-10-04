@@ -83,7 +83,7 @@ KIT_VERSION = (KIT_FILES.parent / "VERSION").read_text(encoding="utf-8").strip()
     if (KIT_FILES.parent / "VERSION").is_file() else "unknown"
 STAMP = Path("openspec") / ".vsdd.json"
 SCRIPTS = ("validate_mermaid.py", "install_overlay.py", "merge_diagrams.py", "seed_before.py",
-           "openspec_preflight.py", "vsdd_snapshot.py")
+           "catalog_diagrams.py", "openspec_preflight.py", "vsdd_snapshot.py")
 SECTION = "## OpenSpec & Visual Spec-Driven Development"
 POINTER_MARK = "vsdd:pointer"
 CHECK_CHANGE = "vsdd-install-check"
@@ -657,6 +657,20 @@ class Installer:
         self.done.append("6 decisions log: created (no entries)")
         self.decisions_created = True
 
+    def step6_catalog(self) -> None:
+        """docs/DIAGRAMS.md, when the project already has Source of Truth diagrams."""
+        if not list((self.root / "openspec" / "specs").glob("**/diagrams.md")):
+            return
+        self.plan.append("6 write docs/DIAGRAMS.md (every diagram on one page)")
+        if self.args.dry_run:
+            return
+        out = run([sys.executable, str(HERE / "catalog_diagrams.py"), "--root", str(self.root)], self.root,
+                  check=False)
+        if out.returncode == 0:
+            self.done.append(f"6 catalogue: {out.stdout.strip()}")
+        else:
+            self.todo.append(f"Step 6: catalog_diagrams.py failed - run it by hand: {out.stdout.strip()} {out.stderr.strip()}")
+
     def step7_stamp(self) -> None:
         """Record what was installed, so `--status` and a later upgrade can compare."""
         path = self.root / STAMP
@@ -694,7 +708,7 @@ class Installer:
         self.tool_files_before = {} if self.args.dry_run else self.tool_files()
         for step in (self.step0_branch_and_snapshot, self.step1_openspec, self.step2_copy,
                      self.step3_config, self.step4_agents, self.step5_overlay, self.step6_decisions,
-                     self.step7_stamp):
+                     self.step6_catalog, self.step7_stamp):
             step()
         if not self.args.dry_run:
             self.todo += self.shared_notes
