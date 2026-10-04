@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.12] - 2026-10-04
+
 ### Added
 - A one-page diagram catalogue. `scripts/vsdd/catalog_diagrams.py` writes
   `docs/DIAGRAMS.md`: every Source of Truth diagram, architecture first, each with its
@@ -298,7 +300,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.11...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.12...HEAD
+[0.3.12]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.11...v0.3.12
 [0.3.11]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.10...v0.3.11
 [0.3.10]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.8...v0.3.9
