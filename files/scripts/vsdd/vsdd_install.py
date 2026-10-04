@@ -531,6 +531,14 @@ class Installer:
         else:
             text = "schema: visual-driven\n\n" + text
             notes.append("schema line added")
+        # Kits before 0.3.14 told agents to read both docs before any diagram, which cost
+        # two read turns per change; the current rule inlines the Mermaid rules instead.
+        old_rule = re.compile(r'^(\s*- )"Read `[^`]*docs/VSDD\.md` and `[^`]*docs/MERMAID_RULES\.md` '
+                              r'before drafting any diagram\."$', re.M)
+        if old_rule.search(text):
+            new_rule = next(l for l in example.splitlines() if l.lstrip().startswith('- "Mermaid: quote'))
+            text = old_rule.sub(lambda m: m.group(1) + new_rule.lstrip()[2:], text, count=1)
+            notes.append("rules.diagrams: doc-reading rule replaced by the inline Mermaid rules")
         if re.search(r"^prompts:", text, re.M):
             self.todo.append("Step 3 (ASK): config.yaml has a `prompts:` key, which OpenSpec ignores. Show "
                              "the user its contents and ask whether to rename it to `rules:`")

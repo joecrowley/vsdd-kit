@@ -49,9 +49,10 @@ the last apply task writes it from the code as built.
 - Decide the `## Diagram needed?` gate first. A visual concern is navigation/routing,
   a state machine, data flow, infrastructure topology, or a data schema.
   - NO: write `NO - <one-line reason>` and stop. No other sections.
-  - YES: read `docs/VSDD.md` sections 1-2, then add a `## Placement` table
+  - YES: add a `## Placement` table
     (Stable name | Source of Truth file | Action | Why here) with one row per diagram
-    touched. Action is update, add, `move from <old file>` or remove. Diagrams belong
+    touched; paths are relative to `openspec/`. Action is update, add,
+    `move from <old file>` or remove. Diagrams belong
     to the capability whose behaviour they show: if the change creates a capability,
     its new flows go in `specs/<capability>/diagrams.md`. A row that adds or moves a
     diagram into `specs/architecture/diagrams.md` must name, in `Why here`, the
@@ -69,13 +70,19 @@ the last apply task writes it from the code as built.
     the diagram says, what the code does. A stale section this change does not touch:
     list it there and suggest a separate sync change; don't widen this change.
   - Write the After sections under the SAME stable names. Removed diagrams have no After.
-- Read `docs/MERMAID_RULES.md` before drafting any diagram. Then run
+- Mermaid: quote node and edge labels that contain spaces or punctuation, but never a
+  sequence-diagram participant alias; explicit `activate`/`deactivate`, not `+`/`-` on
+  arrows; every flowchart declares a direction (`flowchart LR`); no semicolons in a
+  diagram. Then run
   `python3 scripts/vsdd/validate_mermaid.py --change <change-name> --no-names`: it
-  checks the Placement table and that the Before copies are verbatim.
+  checks these rules (all but the quoting), the Placement table and that the Before
+  copies are verbatim.
+  This block and the artifact instruction have what you need: read `docs/VSDD.md` or
+  `docs/MERMAID_RULES.md` (examples) only for a case they don't cover.
 """
 
 GUARD = """\
-> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven` or `visual-driven-light` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. The scripts in `scripts/vsdd/` are tools: run them as the steps say and act on what they print (`--help` lists their options); don't read their source. <!-- vsdd:guard -->"""
+> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven` or `visual-driven-light` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. The scripts in `scripts/vsdd/` are tools: run them exactly as the steps say and act on what they print; don't read their source, and use `--help` only when a step leaves you unsure how to call one. <!-- vsdd:guard -->"""
 FRONTMATTER_END = "<frontmatter-end>"  # anchor: the line after the closing `---` of the YAML front matter
 
 GEN_DECISIONS = """\
@@ -122,13 +129,13 @@ APPLY_TRACE = """\
 
    **Light mode** (`openspec status` shows schema `visual-driven-light`): the change
    has no planned diagrams. After the code is finished, write its `diagrams.md` from
-   the code as built, in the format of `docs/VSDD.md` section 2 (read it and
-   `docs/MERMAID_RULES.md` first): the `## Diagram needed?` gate (NO with a reason
-   stops here); a `## Placement` row per Source of Truth diagram the built code
-   changes, using the existing stable names; `python3 scripts/vsdd/seed_before.py
-   <change-name>` for the Before State; then the `## After State`, drawn from the
-   code. No Deviations section. Then do the trace below, and tell the user the
-   diagrams are ready to review before archiving.
+   the code as built, following the steps in the apply instruction
+   (`openspec instructions apply`), which list the format and the Mermaid rules: the
+   `## Diagram needed?` gate (NO with a reason stops here); a `## Placement` row per
+   Source of Truth diagram the built code changes, using the existing stable names;
+   `python3 scripts/vsdd/seed_before.py <change-name>` for the Before State; then the
+   `## After State`, drawn from the code. No Deviations section. Then do the trace
+   below, and tell the user the diagrams are ready to review before archiving.
 
    **Full mode**: if the change has a `diagrams.md` whose `## Diagram needed?` gate
    is YES, re-read its `## After State` before declaring the work complete and trace
@@ -176,7 +183,8 @@ ARCHIVE_SYNC = """\
 4a. **Sync diagrams into the Source of Truth (VSDD)**
 
    Read `diagrams.md` in the change directory (`<changeRoot>` when the CLI reports
-   one, otherwise `openspec/changes/<name>/`), and `docs/VSDD.md` section 4.
+   one, otherwise `openspec/changes/<name>/`). The steps below are the whole
+   procedure; `docs/VSDD.md` section 4 is background only.
    - Missing in a light-mode change (`openspec status` shows schema
      `visual-driven-light`): apply's Diagrams task was not done. Stop: write
      `diagrams.md` as apply step 6a describes, show it to the user for review, and
@@ -246,7 +254,7 @@ ARCHIVE_GUARDRAIL = """\
 - VSDD: diagram merges are section-targeted by stable name, a NO gate is always a no-op, and the summary must include a Diagrams line <!-- vsdd:archive-guardrail -->"""
 
 UPDATE_GUARDRAIL = """\
-- VSDD: when revising `diagrams.md`, never edit `## Before State` (it is a verbatim Source of Truth snapshot), keep `### <Stable Name>` headings unchanged, keep the `## Placement` table in step with the Before and After sections, re-check the `## Diagram needed?` gate if the scope changed, and keep the After State consistent with the revised proposal, specs and design. Read `docs/VSDD.md` first <!-- vsdd:update-guardrail -->"""
+- VSDD: when revising `diagrams.md`, never edit `## Before State` (it is a verbatim Source of Truth snapshot), keep `### <Stable Name>` headings unchanged, keep the `## Placement` table in step with the Before and After sections, re-check the `## Diagram needed?` gate if the scope changed, and keep the After State consistent with the revised proposal, specs and design, then run `python3 scripts/vsdd/validate_mermaid.py --change <change-name> --no-names` <!-- vsdd:update-guardrail -->"""
 
 BULK_DECISIONS = """\
 - VSDD: for EACH change, also perform the decisions step (4b of the `openspec-archive-change` skill); collect the proposed entries and ask the user once, before archiving the batch <!-- vsdd:bulk-decisions -->"""

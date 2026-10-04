@@ -24,7 +24,7 @@ rules:
   proposal:
     - "List every module/package the change touches in the Impact section."
   diagrams:
-    - "Read `docs/VSDD.md` and `docs/MERMAID_RULES.md` before drafting any diagram."
+    - "Mermaid: quote labels that contain spaces or punctuation (never a sequence-diagram participant alias), use explicit activate/deactivate, give every flowchart a direction, no semicolons. The validator checks all but the quoting; `docs/MERMAID_RULES.md` (examples) and `docs/VSDD.md` (background) are for cases this instruction does not cover, not required reading."
     - "For a YES gate, add a `## Placement` table (Stable name | Source of Truth file | Action: update, add, move from <old file>, remove | Why here). Diagrams belong to the capability whose behaviour they show: when the change creates a capability, its new flows go in specs/<capability>/diagrams.md. A row that adds or moves a diagram into specs/architecture/diagrams.md must say in `Why here` which capabilities it spans."
     - "Write the Before State with python3 scripts/vsdd/seed_before.py <change-name>: it copies the affected stable-named sections verbatim from the file each Placement row names (for a move, the old file) and warns about names the code no longer has. Never edit the Before by hand."
     - "Check the copied sections against the code (read code only where a name is missing or for a flow the change touches). If one is stale, keep its Before as copied, correct it in the After State, and record what was wrong in a top-level `## Source of Truth drift` section (never merged)."

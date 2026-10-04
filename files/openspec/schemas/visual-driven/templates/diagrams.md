@@ -46,7 +46,7 @@ YES
 ## After State
 
 <!-- One `### <Stable Name>` section per update, add or move row: a short
-     description, then a ```mermaid block. Follow docs/MERMAID_RULES.md.
+     description, then a ```mermaid block (the schema instruction lists the Mermaid rules).
      Removed diagrams have no After section.
      Diagram type by concern:
      - sequenceDiagram  -> navigation and routing flows
@@ -57,4 +57,4 @@ YES
 <!-- If implementation later deviates from the proposed After State, add a
      top-level `## Deviations` section (a sibling of Before/After State, NOT a
      merge target) recording: what was proposed, what was built, and why. Do NOT
-     keep a parallel "expected" diagram. See docs/VSDD.md "Deviations". -->
+     keep a parallel "expected" diagram. -->

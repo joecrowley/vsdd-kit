@@ -88,6 +88,10 @@ def main() -> int:
         path.write_text("\n".join(new) + "\n", encoding="utf-8")
         print(f"seeded Before State: {len(copied)} section(s)"
               + (f" from {', '.join(sorted({f'openspec/{s}' for _, s, _ in copied}))}" if copied else ""))
+        after = [n for n, _, a, _ in rows if a != "remove"]
+        if after:
+            print(f"next: under ## After State write {', '.join(f'### {n}' for n in after)} (a one-line "
+                  "description, then the mermaid block), then run the validator as your step says")
 
     if not args.no_names and copied:
         known, n_sources = source_identifiers(root)

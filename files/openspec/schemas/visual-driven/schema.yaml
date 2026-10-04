@@ -78,6 +78,8 @@ artifacts:
       empty otherwise. The validator rejects architecture additions without it.
       - Action is one of: `update` (replace), `add` (new diagram), `move from
       <old file>` (delete from the old file, add to this one), `remove` (delete).
+      Paths are relative to `openspec/`, e.g.
+      `| Sync Topology | specs/architecture/diagrams.md | add | Shared by a and b |`.
 
 
       Step 4 - Write the delta:
@@ -103,7 +105,15 @@ artifacts:
 
 
       Rules:
-      - Read `docs/MERMAID_RULES.md` before drafting any diagram.
+      - Mermaid: quote node and edge labels that contain spaces or punctuation
+      (`A["emit(Loaded)"]`, `-->|"on save"|`), but never a sequence-diagram
+      participant alias (`participant C as Cart Cubit`); use explicit
+      `activate`/`deactivate`, not `+`/`-` on arrows; every flowchart declares a
+      direction (`flowchart LR`); no semicolons anywhere in a diagram. Each
+      diagram is `### <Stable Name>`, a one-line description, then the mermaid
+      block. The validator checks all but the quoting; `docs/MERMAID_RULES.md` has examples,
+      for when a message isn't enough. You don't need to read it or
+      `docs/VSDD.md` first: this instruction has what the artifact needs.
       - Select the diagram type by concern: sequenceDiagram for navigation and
       routing flows, stateDiagram-v2 for state machines (BLoC/Cubit, Redux, XState, workflow states),
       flowchart for infrastructure and system topology, erDiagram for data

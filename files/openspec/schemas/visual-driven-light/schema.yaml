@@ -260,16 +260,28 @@ apply:
     Read context files, work through pending tasks, mark complete as you go.
     Pause if you hit blockers or need clarification.
     VSDD light mode: this change has no planned diagrams. After the code is finished,
-    do the Diagrams task: write the change's diagrams.md from the code as built, in the
-    format of docs/VSDD.md section 2 (read it, and docs/MERMAID_RULES.md, first).
+    do the Diagrams task: write the change's diagrams.md from the code as built. The
+    steps below have what it needs; you don't need to read docs/VSDD.md or
+    docs/MERMAID_RULES.md first (the latter has examples, for when the validator's
+    message isn't enough).
     1. Gate: `## Diagram needed?` - YES if the change altered a navigation or routing
        flow, a state machine, a data flow, infrastructure topology or a data schema;
        otherwise `NO - <one-line reason>` and stop.
     2. `## Placement`: one row per Source of Truth diagram the built code changes
        (Stable name | Source of Truth file | Action | Why here; update, add,
-       `move from <old file>` or remove), using the existing stable names.
+       `move from <old file>` or remove), using the existing stable names. Paths are
+       relative to `openspec/`: capability diagrams in `specs/<capability>/diagrams.md`,
+       cross-cutting ones in `specs/architecture/diagrams.md` (an add or move into
+       that file must name, in Why here, the capabilities it spans).
     3. Run `python3 scripts/vsdd/seed_before.py <change-name>` for the Before State.
-    4. `## After State`: draw each updated or added diagram from the code as built.
-       No Deviations section: nothing was planned to deviate from.
+       Never edit the Before by hand.
+    4. `## After State`: one `### <Stable Name>` per update, add and move row (none for
+       remove): a one-line description, then the mermaid block, drawn from the code as
+       built. No Deviations section: nothing was planned to deviate from.
+       Mermaid: quote node and edge labels that contain spaces or punctuation, but never
+       a sequence-diagram participant alias; explicit activate/deactivate, not +/- on
+       arrows; every flowchart declares a direction (flowchart LR); no semicolons in a
+       diagram. sequenceDiagram for flows, stateDiagram-v2 for state machines,
+       flowchart for topology, erDiagram for data schemas.
     5. Run `python3 scripts/vsdd/validate_mermaid.py --trace <change-name>` and fix
        what it reports. Tell the user the diagrams are ready to review before archiving.

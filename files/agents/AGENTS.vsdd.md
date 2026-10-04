@@ -12,9 +12,8 @@
 
 | When you are... | Read first |
 |---|---|
-| Writing or editing a change's `diagrams.md`, or archiving a change | `docs/VSDD.md` |
-| Drawing or editing any Mermaid diagram | `docs/MERMAID_RULES.md` |
 | Designing a change, or fixing a bug that could recur elsewhere | `openspec/specs/architecture/decisions.md` (rules learned from past changes) |
+| Editing `diagrams.md` or a Mermaid diagram outside the `/opsx` steps | `docs/VSDD.md` (the workflow) and `docs/MERMAID_RULES.md` (syntax). The `/opsx` steps and the schema instructions already carry what they need, so inside them read these only for a case they don't cover. |
 
 - After editing any diagram, run `python3 scripts/vsdd/validate_mermaid.py`.
 - `docs/DIAGRAMS.md` shows every diagram on one page, linked to its spec and code. It is
