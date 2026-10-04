@@ -38,7 +38,14 @@ SKIP_DIRS = {"node_modules", ".git", ".dart_tool", "build", ".venv", "venv"}
 
 GEN_DIAGRAMS = """\
 <!-- vsdd:gen-diagrams -->
-**VSDD - diagrams.md** (schema `visual-driven`, DAG proposal -> diagrams -> specs -> design -> tasks):
+**VSDD - mode.** A new change takes the project's default schema (`schema:` in
+`openspec/config.yaml`). If the user asks for full or light mode for this change, create
+it with `openspec new change "<name>" --schema visual-driven` (full) or
+`--schema visual-driven-light` (light). In light mode (`openspec status` shows schema
+`visual-driven-light`) there is no diagrams artifact: skip the diagrams.md steps below;
+the last apply task writes it from the code as built.
+
+**VSDD - diagrams.md** (full mode, schema `visual-driven`, DAG proposal -> diagrams -> specs -> design -> tasks):
 - Decide the `## Diagram needed?` gate first. A visual concern is navigation/routing,
   a state machine, data flow, infrastructure topology, or a data schema.
   - NO: write `NO - <one-line reason>` and stop. No other sections.
@@ -68,7 +75,7 @@ GEN_DIAGRAMS = """\
 """
 
 GUARD = """\
-> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. The scripts in `scripts/vsdd/` are tools: run them as the steps say and act on what they print (`--help` lists their options); don't read their source. <!-- vsdd:guard -->"""
+> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven` or `visual-driven-light` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. The scripts in `scripts/vsdd/` are tools: run them as the steps say and act on what they print (`--help` lists their options); don't read their source. <!-- vsdd:guard -->"""
 FRONTMATTER_END = "<frontmatter-end>"  # anchor: the line after the closing `---` of the YAML front matter
 
 GEN_DECISIONS = """\
@@ -100,9 +107,10 @@ they show that the code no longer has.
 EXPLORE_CAPTURE = """\
    <!-- vsdd:explore-capture -->
    VSDD: a flow, state machine or structure that changes belongs in the change's
-   `diagrams.md`. Don't draw it from here: note the change in the proposal or design,
-   and let `/opsx-propose` (or `/opsx-continue`) add the Placement row, copy the Before
-   State with `seed_before.py` and draw the After.
+   `diagrams.md`. Don't draw it from here: note the change in the proposal or design.
+   In full mode `/opsx-propose` (or `/opsx-continue`) adds the Placement row, copies the
+   Before State with `seed_before.py` and draws the After; in light mode the last apply
+   task draws them from the code as built.
 """
 
 PROPOSE_LIST = """\
@@ -112,9 +120,19 @@ APPLY_TRACE = """\
 <!-- vsdd:apply-trace -->
 6a. **Verify diagrams match the final code (VSDD)**
 
-   If the change has a `diagrams.md` whose `## Diagram needed?` gate is YES,
-   re-read its `## After State` before declaring the work complete and trace it
-   against the final code:
+   **Light mode** (`openspec status` shows schema `visual-driven-light`): the change
+   has no planned diagrams. After the code is finished, write its `diagrams.md` from
+   the code as built, in the format of `docs/VSDD.md` section 2 (read it and
+   `docs/MERMAID_RULES.md` first): the `## Diagram needed?` gate (NO with a reason
+   stops here); a `## Placement` row per Source of Truth diagram the built code
+   changes, using the existing stable names; `python3 scripts/vsdd/seed_before.py
+   <change-name>` for the Before State; then the `## After State`, drawn from the
+   code. No Deviations section. Then do the trace below, and tell the user the
+   diagrams are ready to review before archiving.
+
+   **Full mode**: if the change has a `diagrams.md` whose `## Diagram needed?` gate
+   is YES, re-read its `## After State` before declaring the work complete and trace
+   it against the final code:
    - Run `python3 scripts/vsdd/validate_mermaid.py --trace <change-name>`. It
      validates the change and looks up every code-like name in the After State:
      it fails on names no source file contains, and lists the files that mention
@@ -143,10 +161,13 @@ VERIFY_FIDELITY = """\
      - Missing or misplaced symbol:
        - Add WARNING: "Diagram does not match code: <participant/edge>"
        - Recommendation: "Update the After State to match the implementation, or fix the code"
-     - Implementation deviates from the proposal but there is no `## Deviations` section:
+     - Full mode only: implementation deviates from the proposal but there is no `## Deviations` section:
        - Add WARNING: "Diagram deviates from proposal but no Deviations note"
        - Recommendation: "Add a `## Deviations` section (Proposed / Built / Why)"
-   - If there is no `diagrams.md` or the gate is NO: note "No diagram to verify"
+   - Light mode (schema `visual-driven-light`) with no `diagrams.md` after the tasks are done:
+     - Add WARNING: "Light-mode change has no diagrams.md"
+     - Recommendation: "Do the Diagrams task: write diagrams.md from the code as built"
+   - Otherwise, if there is no `diagrams.md` or the gate is NO: note "No diagram to verify"
 
 """
 
@@ -156,7 +177,11 @@ ARCHIVE_SYNC = """\
 
    Read `diagrams.md` in the change directory (`<changeRoot>` when the CLI reports
    one, otherwise `openspec/changes/<name>/`), and `docs/VSDD.md` section 4.
-   - Missing, or gate is NO: no-op. Record "Diagrams: no-op".
+   - Missing in a light-mode change (`openspec status` shows schema
+     `visual-driven-light`): apply's Diagrams task was not done. Stop: write
+     `diagrams.md` as apply step 6a describes, show it to the user for review, and
+     archive only after they accept it.
+   - Missing in full mode, or gate is NO: no-op. Record "Diagrams: no-op".
    - If `scripts/vsdd/merge_diagrams.py` exists, run it with `--dry-run` first
      and show the plan, then run it for real:
      `python3 scripts/vsdd/merge_diagrams.py <change dir>`. It validates the change

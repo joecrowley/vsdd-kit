@@ -10,6 +10,20 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Added
+- Light mode. A second schema, `visual-driven-light`, plans no diagrams at propose
+  (`proposal → specs → design → tasks`); the last apply task writes `diagrams.md` from
+  the code as built (gate, Placement, Before via `seed_before.py`, After, trace), and
+  you review it before archiving. Full mode (`visual-driven`) is unchanged. The mode is
+  per change (the schema it was created with) with a project default (`schema:` in
+  config.yaml); `scripts/vsdd/vsdd_mode.py` (`vsdd-kit mode`) shows the default and
+  each change's mode, and sets the default. The patched skills branch on the change's
+  schema: propose skips diagrams.md in light mode and can create a change in either mode
+  on request, apply writes the diagrams in light mode, verify warns when a light change
+  has none, and archive stops instead of archiving a light change without diagrams. The
+  installer copies both schemas and keeps a light default on upgrade. Light mode is
+  untested with agents so far: it is meant to cut VSDD's cost per change, not yet shown to.
+
 ## [0.3.12] - 2026-10-04
 
 ### Added

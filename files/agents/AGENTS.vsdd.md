@@ -1,6 +1,10 @@
 ## OpenSpec & Visual Spec-Driven Development
 
-- Changes use the OpenSpec `visual-driven` schema: `proposal → diagrams → specs → design → tasks`.
+- Changes use one of two OpenSpec schemas. Full mode, `visual-driven`:
+  `proposal → diagrams → specs → design → tasks`. Light mode, `visual-driven-light`:
+  `proposal → specs → design → tasks`, and the last apply task writes `diagrams.md` from
+  the code as built. `openspec status --change <name>` shows a change's schema;
+  `python3 scripts/vsdd/vsdd_mode.py` shows or sets the project default.
   Use the `/opsx` commands or `openspec-*` skills rather than editing change folders ad hoc.
 - Current architecture diagrams: `openspec/specs/<capability>/diagrams.md`
   (cross-cutting: `openspec/specs/architecture/diagrams.md`). Read the relevant one before

@@ -48,7 +48,7 @@ echo "  info  skills per tool: $(ls -d .claude/skills/openspec-* .opencode/skill
 
 step "2. copy kit files"
 mkdir -p openspec/schemas docs scripts/vsdd
-cp -R "$KIT"/files/openspec/schemas/visual-driven openspec/schemas/
+cp -R "$KIT"/files/openspec/schemas/visual-driven "$KIT"/files/openspec/schemas/visual-driven-light openspec/schemas/
 cp "$KIT"/files/docs/VSDD.md "$KIT"/files/docs/MERMAID_RULES.md docs/
 cp "$KIT"/files/scripts/vsdd/*.py scripts/vsdd/
 openspec schema validate visual-driven 2>&1 | grep -q "is valid" && pass "schema valid" || fail "schema invalid"
@@ -302,7 +302,7 @@ git switch -q -c vsdd-install
 XDG_CONFIG_HOME="$XR" python3 "$SNAPPY" save --out "$SNAP" >/dev/null && [ -f "$SNAP/manifest.json" ] \
   && pass "snapshot saved (untracked .claude + global config)" || fail "snapshot save"
 mkdir -p openspec/schemas docs scripts/vsdd
-cp -R "$KIT"/files/openspec/schemas/visual-driven openspec/schemas/
+cp -R "$KIT"/files/openspec/schemas/visual-driven "$KIT"/files/openspec/schemas/visual-driven-light openspec/schemas/
 cp "$KIT"/files/docs/VSDD.md "$KIT"/files/docs/MERMAID_RULES.md docs/
 cp "$KIT"/files/scripts/vsdd/*.py scripts/vsdd/
 cp "$KIT"/files/openspec/config.yaml.example openspec/config.yaml
@@ -458,6 +458,25 @@ grep -q "5 overlay: 0 skill/command file(s) differ" <<<"$OUT" \
   && pass "re-run reports 0 overlay changes, although openspec update regenerated the stock files" || fail "re-run overlay count: $(grep '5 overlay' <<<"$OUT")"
 [ "$(ls "$IH/.vsdd-snapshots" | wc -l)" = "$NSNAP" ] && pass "re-run on the install branch reuses the pre-install snapshot" \
   || fail "re-run took a new snapshot of a half-installed state"
+# Light mode: a second schema, a project default, per-change modes
+LIGHT_BASE=$(git rev-parse HEAD); MODE="python3 scripts/vsdd/vsdd_mode.py"
+openspec schema validate visual-driven-light >/dev/null 2>&1 && [ -f scripts/vsdd/vsdd_mode.py ] \
+  && pass "light mode: installer copies the light schema (valid) and vsdd_mode.py" || fail "light schema or vsdd_mode.py missing"
+$MODE | grep -q "Default mode (new changes): full (visual-driven)" && $MODE light >/dev/null \
+  && grep -q "^schema: visual-driven-light$" openspec/config.yaml && pass "vsdd_mode.py shows full, then sets light" || fail "vsdd_mode.py set light"
+openspec new change lt-smoke >/dev/null 2>&1 && grep -q "^schema: visual-driven-light" openspec/changes/lt-smoke/.openspec.yaml \
+  && ! openspec status --change lt-smoke 2>&1 | grep -q "diagrams" && $MODE | grep -q "lt-smoke: light" \
+  && pass "a new change takes the light default: no diagrams artifact" || fail "light change: $(openspec status --change lt-smoke 2>&1 | tail -5)"
+openspec new change ft-smoke --schema visual-driven >/dev/null 2>&1 && openspec status --change ft-smoke 2>&1 | grep -q "diagrams" \
+  && pass "one change can still use full mode (--schema visual-driven)" || fail "per-change full mode"
+{ grep -q "Light mode" .claude/skills/openspec-apply-change/SKILL.md 2>/dev/null || grep -q "Light mode" .qwen/skills/openspec-apply-change/SKILL.md 2>/dev/null; } \
+  && pass "the apply skill has the light-mode step" || fail "apply skill lacks the light-mode step"
+rm -rf openspec/changes/lt-smoke openspec/changes/ft-smoke; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm light
+OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && grep -q "^schema: visual-driven-light$" openspec/config.yaml \
+  && grep -q "light mode kept" <<<"$OUT" && grep -q "3 config check: rules reach" <<<"$OUT" \
+  && pass "re-running the installer keeps a light default (config check still passes)" || fail "installer reset the light default: $(grep '^schema' openspec/config.yaml)"
+$MODE full >/dev/null && grep -q "^schema: visual-driven$" openspec/config.yaml && pass "vsdd_mode.py full restores full mode" || fail "vsdd_mode.py full"
+git reset -q --hard "$LIGHT_BASE"; git clean -qfd
 ROOT8="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-again.XXXXXX")"
 cd "$ROOT8"; git init -q -b main; echo "# again" > README.md; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base
 HOME="$IH" python3 "$INST" --root . --tools claude --agents-md skip >/dev/null 2>&1 || fail "first install (reinstall test)"

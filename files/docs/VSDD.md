@@ -7,6 +7,23 @@ delta, and archiving merges the After state back.
 Read this file when you create or edit a change's `diagrams.md`, when you design a
 change (§6), or when you archive a change. Read `docs/MERMAID_RULES.md` before drawing any diagram.
 
+**Modes.** A change is full or light, by the schema it was created with:
+
+| | Full (`visual-driven`) | Light (`visual-driven-light`) |
+|---|---|---|
+| Propose | proposal → **diagrams** → specs → design → tasks | proposal → specs → design → tasks |
+| `diagrams.md` | planned before the code: Before copied, After drawn from the design | written by the last apply task: Before copied, After drawn from the code as built |
+| Review | the plan before apply, and the corrected diagrams before archive | the as-built diagrams before archive |
+| Apply's end | trace the After State; record Deviations from the plan | trace the After State; no Deviations (nothing was planned) |
+| Archive | the same merge (§4) | the same merge (§4); a missing `diagrams.md` stops it |
+
+The project default is the `schema:` line of `openspec/config.yaml`:
+`python3 scripts/vsdd/vsdd_mode.py` shows it and every in-flight change's mode, and
+`vsdd_mode.py light` or `full` sets it. One change can use the other mode:
+`openspec new change <name> --schema visual-driven-light` (or ask the agent to propose it
+in light mode). A change keeps its mode; to switch, start it again. Both modes write the
+same `diagrams.md` format, so everything below applies to both.
+
 ## 1. Source of Truth
 
 - Capability-owned diagrams: `openspec/specs/<capability>/diagrams.md`, next to the
@@ -36,7 +53,8 @@ change (§6), or when you archive a change. Read `docs/MERMAID_RULES.md` before 
 
 ## 2. The change artifact: `diagrams.md`
 
-Pipeline (schema `visual-driven`): `proposal → diagrams → specs → design → tasks`.
+Full mode: written at propose (`proposal → diagrams → specs → design → tasks`). Light
+mode: written by the last apply task, from the code as built (no Deviations).
 
 1. **Gate.** Start with `## Diagram needed?`. Answer YES if the change affects
    navigation/routing, a state machine, data flow, infrastructure topology or a data

@@ -83,7 +83,8 @@ KIT_VERSION = (KIT_FILES.parent / "VERSION").read_text(encoding="utf-8").strip()
     if (KIT_FILES.parent / "VERSION").is_file() else "unknown"
 STAMP = Path("openspec") / ".vsdd.json"
 SCRIPTS = ("validate_mermaid.py", "install_overlay.py", "merge_diagrams.py", "seed_before.py",
-           "catalog_diagrams.py", "openspec_preflight.py", "vsdd_snapshot.py")
+           "catalog_diagrams.py", "vsdd_mode.py", "openspec_preflight.py", "vsdd_snapshot.py")
+VSDD_SCHEMAS = ("visual-driven", "visual-driven-light")  # full mode, light mode
 SECTION = "## OpenSpec & Visual Spec-Driven Development"
 POINTER_MARK = "vsdd:pointer"
 CHECK_CHANGE = "vsdd-install-check"
@@ -432,10 +433,11 @@ class Installer:
         self.plan.append(f"2 copy schema; docs/VSDD.md, docs/MERMAID_RULES.md (if missing), scripts/vsdd/{where}")
         if self.args.dry_run:
             return
-        dest = root / "openspec" / "schemas" / "visual-driven"
-        if dest.exists():
-            shutil.rmtree(dest)
-        shutil.copytree(KIT_FILES / "openspec" / "schemas" / "visual-driven", dest)
+        for name in VSDD_SCHEMAS:
+            dest = root / "openspec" / "schemas" / name
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(KIT_FILES / "openspec" / "schemas" / name, dest)
         in_place = self.tooling is not None and self.tooling == KIT_FILES.resolve()
         if self.tooling:
             left = [p for p in ("docs/VSDD.md", "docs/MERMAID_RULES.md", "scripts/vsdd") if (root / p).exists()]
@@ -443,9 +445,10 @@ class Installer:
                 self.todo.append(f"Step 2: the project still has its own copies of {', '.join(left)}. The tooling "
                                  f"now lives in {self.T}: remove them from the project if the kit put them there")
         if in_place:
-            run(["openspec", "schema", "validate", "visual-driven"], root)
-            self.done.append(f"2 copied the schema into the project; docs and scripts used in place from the kit "
-                             f"({self.T}); schema is valid")
+            for name in VSDD_SCHEMAS:
+                run(["openspec", "schema", "validate", name], root)
+            self.done.append(f"2 copied the schemas into the project; docs and scripts used in place from the kit "
+                             f"({self.T}); schemas are valid")
             return
         (tools / "docs").mkdir(parents=True, exist_ok=True)
         shutil.copy2(KIT_FILES / "docs" / "VSDD.md", tools / "docs" / "VSDD.md")
@@ -460,9 +463,10 @@ class Installer:
         (tools / "scripts" / "vsdd").mkdir(parents=True, exist_ok=True)
         for name in SCRIPTS:
             shutil.copy2(HERE / name, tools / "scripts" / "vsdd" / name)
-        run(["openspec", "schema", "validate", "visual-driven"], root)
-        self.done.append("2 copied the schema into the project" + (
-            f", docs and scripts into {self.T}" if self.tooling else ", docs and scripts") + "; schema is valid")
+        for name in VSDD_SCHEMAS:
+            run(["openspec", "schema", "validate", name], root)
+        self.done.append("2 copied the schemas into the project" + (
+            f", docs and scripts into {self.T}" if self.tooling else ", docs and scripts") + "; schemas are valid")
 
     def step3_config(self) -> None:
         path = self.root / "openspec" / "config.yaml"
@@ -519,6 +523,8 @@ class Installer:
         if self.custom_schema and self.args.custom_schema == "keep":
             self.todo.append(f"Step 3 (b): add the diagrams artifact to the custom schema '{self.schema}' "
                              "by hand, then `openspec schema validate` it")
+        elif re.search(r"^schema:\s*visual-driven-light\s*$", text, re.M):
+            notes.append("schema: visual-driven-light (light mode kept)")
         elif re.search(r"^schema:", text, re.M):
             text = re.sub(r"^schema:.*$", "schema: visual-driven", text, count=1, flags=re.M)
             notes.append("schema: visual-driven")
@@ -568,7 +574,7 @@ class Installer:
         if change_dir.exists():
             raise Failed(f"{change_dir} already exists - remove it and re-run")
         try:
-            run(["openspec", "new", "change", CHECK_CHANGE], root)
+            run(["openspec", "new", "change", CHECK_CHANGE, "--schema", "visual-driven"], root)
             out = run(["openspec", "instructions", "diagrams", "--change", CHECK_CHANGE], root).stdout
             missing = [p for p in ("<rules>", "MERMAID_RULES") if p not in out]
             if missing and getattr(self, "config_incomplete", False):
@@ -793,9 +799,9 @@ def show_status(args: argparse.Namespace) -> int:
                      "so run the overlay check after any `openspec update`")
 
     # Files the kit owns: they should match this kit byte for byte.
-    schema_src = KIT_FILES / "openspec" / "schemas" / "visual-driven"
-    pairs = [(f, root / "openspec" / "schemas" / "visual-driven" / f.relative_to(schema_src))
-             for f in sorted(schema_src.rglob("*")) if f.is_file()]
+    pairs = [(f, root / "openspec" / "schemas" / name / f.relative_to(KIT_FILES / "openspec" / "schemas" / name))
+             for name in VSDD_SCHEMAS
+             for f in sorted((KIT_FILES / "openspec" / "schemas" / name).rglob("*")) if f.is_file()]
     tooling = args.tooling_dir.expanduser().resolve() if args.tooling_dir else (
         resolve_ref(stamp["tooling_dir"], root, folders) if stamp.get("tooling_dir") else root)
     if tooling is None:

@@ -47,12 +47,13 @@ flowchart TD
 | `seed_before.py` | Writes a change's `## Before State` from its Placement table, copying each section verbatim from the Source of Truth, and reports drift for the sections it copied. Imports the parsers from `validate_mermaid.py` | The patched propose skill |
 | `merge_diagrams.py` | The archive merge: applies Placement rows (remove, move, update, add), refuses if the Source of Truth changed. Imports the structure checks and `already_merged` from `validate_mermaid.py` | The patched archive skill |
 | `catalog_diagrams.py` | Writes `docs/DIAGRAMS.md`: every Source of Truth diagram on one page, with the spec's Purpose, links to the spec and `diagrams.md`, the file that declares each name, and the diagrams that share names. Keeps the hand-written overview block, records a hash of its inputs; `--check`, and a validator warning, report when it is out of date. Imports the parsers and `ranked_locations` from `validate_mermaid.py` | The patched archive skill, you |
-| `vsdd_kit/cli.py` | The `vsdd-kit` command when the kit is installed as a package: runs the scripts above by name (`install`, `status`, `validate`, `overlay`, `merge`, `seed`, `catalog`, ...), prints the guides, and `path` names the kit folder inside the package. The wheel holds the kit in the repository's layout (`pyproject.toml`) | You, or the agent, via `uvx` / `pipx` |
+| `vsdd_mode.py` | Shows the project's default mode (the `schema:` line: full `visual-driven` or light `visual-driven-light`) and each in-flight change's mode, or sets the default. Imports `configured_schema` and `in_flight_changes` from `openspec_preflight.py` | You |
+| `vsdd_kit/cli.py` | The `vsdd-kit` command when the kit is installed as a package: runs the scripts above by name (`install`, `status`, `validate`, `overlay`, `merge`, `seed`, `catalog`, `mode`, ...), prints the guides, and `path` names the kit folder inside the package. The wheel holds the kit in the repository's layout (`pyproject.toml`) | You, or the agent, via `uvx` / `pipx` |
 | `vsdd_snapshot.py` | Saves and restores what git can't: untracked install files and the global OpenSpec config | The installer (save), you (restore) |
 
 ## Where the pieces end up
 
-- **In the project:** the `visual-driven` schema (OpenSpec only looks there), the
+- **In the project:** the `visual-driven` and `visual-driven-light` schemas (OpenSpec only looks there), the
   `config.yaml` entries, the diagrams and the decisions log. Also the docs and scripts,
   unless `--tooling-dir` puts them elsewhere.
 - **In the tool folders** (the project's, or a shared workspace folder): the patched

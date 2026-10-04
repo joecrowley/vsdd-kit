@@ -40,7 +40,7 @@ import tempfile
 from pathlib import Path
 
 SKIP_DIRS = {".git", "node_modules", ".dart_tool", "build", ".venv", "venv"}
-STOCK_SCHEMAS = {"spec-driven", "visual-driven"}
+STOCK_SCHEMAS = {"spec-driven", "visual-driven", "visual-driven-light"}
 # OpenSpec tool id -> project folders it writes (measured with OpenSpec 1.14.0 by running
 # `openspec init --tools <id>` for every tool). Several tools share `.agents`.
 # HOME_TOOLS write outside the project instead.
@@ -320,7 +320,8 @@ def main() -> int:
         if unknown_tools:
             print(f"Unknown tool ids:    {', '.join(unknown_tools)} (check their folder by hand)")
         for name, s in changes:
-            note = "" if s == "visual-driven" else "  (keeps its schema: no diagrams.md, no diagram merge)"
+            note = ("" if s == "visual-driven" else "  (light mode: diagrams.md is written at the end of apply)"
+                    if s == "visual-driven-light" else "  (keeps its schema: no diagrams.md, no diagram merge)")
             print(f"In-flight change:    {name} [{s}]{note}")
         for s in shared_report:
             state = "STOCK (not VSDD-patched)" if s["stock"] else "VSDD-patched" + (
