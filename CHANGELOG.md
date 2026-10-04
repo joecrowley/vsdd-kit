@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.10] - 2026-10-04
+
 ### Added
 - Explore uses the diagrams. The overlay now patches the `openspec-explore` skill: when
   the project has Source of Truth diagrams, explore reads the sections that cover the
@@ -272,7 +274,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.9...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.10...HEAD
+[0.3.10]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.9...v0.3.10
 [0.3.9]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.8...v0.3.9
 [0.3.8]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.7...v0.3.8
 [0.3.7]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.6...v0.3.7
