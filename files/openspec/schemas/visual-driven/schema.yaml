@@ -94,8 +94,8 @@ artifacts:
       a section is stale, keep its Before as copied, make its After match the real
       code plus this change, and add a top-level `## Source of Truth drift`
       section (a list, never merged) saying what the diagram says and what the
-      code does. List stale sections this change does not touch there too, and
-      suggest a separate sync change.
+      code does. Do not audit diagrams this change does not touch: if
+      `seed_before.py` warns about one, mention it in one line and move on.
       - `## After State`: one `### <Stable Name>` per update, add and move row.
       Keep existing stable names unchanged. Removed diagrams have no After
       section.
@@ -340,4 +340,5 @@ apply:
     `python3 scripts/vsdd/validate_mermaid.py --trace <change-name>`, which fails on
     names no source file contains and lists where the others are, then check that
     they are on the call path. Where the code differs, update the After State to
-    match the code and add a top-level `## Deviations` section (Proposed / Built / Why).
+    match the code and add a top-level `## Deviations` section: one line per
+    difference, `- **<what>:** proposed <X>, built <Y>. Why: <25 words at most>`.

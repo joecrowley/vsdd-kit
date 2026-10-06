@@ -539,6 +539,12 @@ class Installer:
             new_rule = next(l for l in example.splitlines() if l.lstrip().startswith('- "Mermaid: quote'))
             text = old_rule.sub(lambda m: m.group(1) + new_rule.lstrip()[2:], text, count=1)
             notes.append("rules.diagrams: doc-reading rule replaced by the inline Mermaid rules")
+        # Kits before 0.3.15 asked for Proposed / Built / Why prose per deviation.
+        old_dev = "add a top-level `## Deviations` section (Proposed / Built / Why)."
+        if old_dev in text:
+            text = text.replace(old_dev, "add a top-level `## Deviations` section: one line per difference, "
+                                "`- **<what>:** proposed <X>, built <Y>. Why: <25 words at most>`.")
+            notes.append("operations.apply: Deviations guidance now asks for one line per difference")
         if re.search(r"^prompts:", text, re.M):
             self.todo.append("Step 3 (ASK): config.yaml has a `prompts:` key, which OpenSpec ignores. Show "
                              "the user its contents and ask whether to rename it to `rules:`")

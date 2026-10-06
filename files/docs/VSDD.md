@@ -98,8 +98,8 @@ mode: written by the last apply task, from the code as built (no Deviations).
    drifted, keep its Before as copied (it is the record of what the Source of Truth
    said), make the After match the real code plus this change, and add a top-level
    `## Source of Truth drift` section: a list of what the diagram says and what the
-   code does. Like Deviations, it is never merged. A stale section the change does not
-   touch is listed there too, with a suggestion to fix it in a separate sync change.
+   code does. Like Deviations, it is never merged. Do not audit diagrams the change does
+   not touch: if `seed_before.py` warns about one, mention it in one line and move on.
 
 The validator checks that the Placement table matches the Before and After sections,
 that each Before copy is verbatim, and that architecture-file additions have a
@@ -119,7 +119,8 @@ canonical diagram. When implementation differs from the proposal:
   in the expected place and on the call path.
 - Update the After State to match the code.
 - Add a top-level `## Deviations` section (a sibling of Before/After, and never
-  merged) with **Proposed / Built / Why** for each difference.
+  merged): one line per difference, `- **<what>:** proposed <X>, built <Y>. Why: <reason,
+  25 words at most>`.
 - Do not keep a parallel "expected" diagram.
 
 Code that exists but has no production call site yet can stay in the diagram as a

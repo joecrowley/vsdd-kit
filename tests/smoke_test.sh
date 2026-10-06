@@ -486,6 +486,19 @@ OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && ! grep -q 
   && grep -q '^    - "Mermaid: quote' openspec/config.yaml && grep -q "doc-reading rule replaced" <<<"$OUT" && grep -q "3 config check: rules reach" <<<"$OUT" \
   && pass "upgrade replaces the old read-both-docs rule with the inline Mermaid rules" || fail "old diagrams rule kept: $(grep -n 'drafting\|Mermaid: quote' openspec/config.yaml | cut -c1-80)"
 git reset -q --hard "$LIGHT_BASE"; git clean -qfd
+# Upgrade from a kit that asked for Proposed / Built / Why prose per deviation
+python3 - <<'PY'
+import re, pathlib
+p = pathlib.Path("openspec/config.yaml"); s = p.read_text()
+s2 = re.sub(r"section: one line per difference, `[^`]*`\.", "section (Proposed / Built / Why).", s, count=1)
+assert s2 != s, "smoke setup: new Deviations rule not found"
+p.write_text(s2)
+PY
+git add -A; git -c user.email=s@t -c user.name=smoke commit -qm old-deviations
+OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && ! grep -q "Proposed / Built / Why" openspec/config.yaml \
+  && grep -q "one line per difference" openspec/config.yaml && grep -q "Deviations guidance now asks" <<<"$OUT" \
+  && pass "upgrade replaces the old Proposed / Built / Why Deviations rule" || fail "old Deviations rule kept"
+git reset -q --hard "$LIGHT_BASE"; git clean -qfd
 ROOT8="$(mktemp -d "${TMPDIR:-/tmp}/vsdd-smoke-again.XXXXXX")"
 cd "$ROOT8"; git init -q -b main; echo "# again" > README.md; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm base
 HOME="$IH" python3 "$INST" --root . --tools claude --agents-md skip >/dev/null 2>&1 || fail "first install (reinstall test)"

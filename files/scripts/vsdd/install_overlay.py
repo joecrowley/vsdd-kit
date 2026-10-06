@@ -67,8 +67,8 @@ the last apply task writes it from the code as built.
     keep its Before as copied (it is what the Source of Truth says), make its After
     match the code as it really is plus this change, and add a top-level
     `## Source of Truth drift` section (a list, no `###` headings; never merged): what
-    the diagram says, what the code does. A stale section this change does not touch:
-    list it there and suggest a separate sync change; don't widen this change.
+    the diagram says, what the code does. Don't audit diagrams this change does not
+    touch: if seed_before.py warns about one, mention it in one line and move on.
   - Write the After sections under the SAME stable names. Removed diagrams have no After.
 - Mermaid: quote node and edge labels that contain spaces or punctuation, but never a
   sequence-diagram participant alias; explicit `activate`/`deactivate`, not `+`/`-` on
@@ -149,7 +149,8 @@ APPLY_TRACE = """\
      listed files only where you need to.
    - If the implementation deviated from the proposed After State: update the
      After State to match the code, and add a top-level `## Deviations` section
-     recording **Proposed / Built / Why**. Never keep a parallel "expected" diagram.
+     with one line per difference: `- **<what>:** proposed <X>, built <Y>. Why: <25 words
+     at most>`. Never keep a parallel "expected" diagram.
    - The After State must reflect the ACTUAL implementation - it is merged into
      the Source of Truth on archive.
 """
@@ -170,7 +171,7 @@ VERIFY_FIDELITY = """\
        - Recommendation: "Update the After State to match the implementation, or fix the code"
      - Full mode only: implementation deviates from the proposal but there is no `## Deviations` section:
        - Add WARNING: "Diagram deviates from proposal but no Deviations note"
-       - Recommendation: "Add a `## Deviations` section (Proposed / Built / Why)"
+       - Recommendation: "Add a `## Deviations` section, one line per difference (proposed, built, why)"
    - Light mode (schema `visual-driven-light`) with no `diagrams.md` after the tasks are done:
      - Add WARNING: "Light-mode change has no diagrams.md"
      - Recommendation: "Do the Diagrams task: write diagrams.md from the code as built"
