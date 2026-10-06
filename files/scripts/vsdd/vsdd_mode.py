@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Show or set the VSDD mode: full or light.
+"""Show or set the VSDD mode: full, light or sketch.
 
   full   schema `visual-driven`: diagrams.md is planned at propose (Before/After), the
          user can review it before apply, and apply traces it against the code
   light  schema `visual-driven-light`: no diagrams at propose; the last apply task
          writes diagrams.md from the code as built, for review before archiving
+  sketch schema `visual-driven-sketch` (experimental): propose writes the planned diagram
+         changes in words (Placement + Planned Changes), for review before apply; the
+         last apply task draws the Before/After from the code as built
 
 The project default is the `schema:` line of openspec/config.yaml; a new change takes it
 unless it is created with `openspec new change <name> --schema <schema>`. Each change
@@ -15,6 +18,7 @@ Usage:
   python3 scripts/vsdd/vsdd_mode.py            # show the default and each change's mode
   python3 scripts/vsdd/vsdd_mode.py light      # make light the default for new changes
   python3 scripts/vsdd/vsdd_mode.py full       # make full the default for new changes
+  python3 scripts/vsdd/vsdd_mode.py sketch     # make sketch the default for new changes
 
 Exit code 0 = ok, 1 = the project has no config.yaml or uses another schema, 2 = bad invocation.
 """
@@ -28,7 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from openspec_preflight import configured_schema, in_flight_changes  # noqa: E402
 
-MODES = {"full": "visual-driven", "light": "visual-driven-light"}
+MODES = {"full": "visual-driven", "light": "visual-driven-light", "sketch": "visual-driven-sketch"}
 NAMES = {v: k for k, v in MODES.items()}
 
 

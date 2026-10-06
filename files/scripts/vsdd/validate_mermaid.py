@@ -13,6 +13,9 @@ catches anything the linter cannot (unquoted labels, bad syntax).
 
 Structure checks (active change diagrams.md files):
   - first section is `## Diagram needed?` with a YES or NO decision
+  - sketch mode, before apply draws the diagrams: `## Placement` and `## Planned Changes`
+    (one `### <Stable Name>` per row, in words) instead of Before/After; --trace and the
+    archive merge reject a sketch
   - YES gate has `## Placement`, `## Before State` and `## After State`
   - every Placement row (update / add / move from <file> / remove) matches the
     Before and After `### <Stable Name>` sections, and vice versa
@@ -306,7 +309,25 @@ def _parse_placement(body: str) -> tuple[list[tuple[str, str, str, str | None]],
     return rows, errors
 
 
-def check_change_structure(path: Path, lines: list[str], root: Path, verify_before: bool) -> list[tuple[int, str]]:
+def is_sketch(lines: list[str]) -> bool:
+    """Sketch mode before apply draws the diagrams: Planned Changes, no Before or After State."""
+    h2 = {n for n, _, _ in _sections(lines, "##")}
+    return "Planned Changes" in h2 and not h2 & {"Before State", "After State"}
+
+
+def check_sketch(lines: list[str], h2: dict, rows: list) -> list[tuple[int, str]]:
+    planned_line = h2["Planned Changes"][0]
+    next_h2 = min((ln for ln, _ in h2.values() if ln > planned_line), default=len(lines) + 1)
+    planned = {n: ln for n, ln, _ in _sections(lines, "###") if planned_line < ln < next_h2}
+    errors = [(planned_line, f"'{name}' ({action}) needs '### {name}' under Planned Changes")
+              for name, _, action, _ in rows if name not in planned]
+    names = {r[0] for r in rows}
+    errors += [(ln, f"Planned Changes '{n}' has no Placement row") for n, ln in planned.items() if n not in names]
+    return errors
+
+
+def check_change_structure(path: Path, lines: list[str], root: Path, verify_before: bool,
+                           allow_sketch: bool = True) -> list[tuple[int, str]]:
     h2 = {n: (ln, body) for n, ln, body in _sections(lines, "##")}
     names = [n for n, _, _ in _sections(lines, "##")]
     if not names or names[0] != "Diagram needed?":
@@ -320,7 +341,13 @@ def check_change_structure(path: Path, lines: list[str], root: Path, verify_befo
         return []
 
     errors: list[tuple[int, str]] = []
-    for required in ("Placement", "Before State", "After State"):
+    if is_sketch(lines):
+        if not allow_sketch:
+            return [(h2["Planned Changes"][0], "the diagrams are still a sketch (Planned Changes only): draw them "
+                     "from the code first - seed_before.py for the Before State, then the After State")]
+        if "Placement" not in h2:
+            return [(1, "YES gate requires '## Placement'")]
+    for required in (("Placement",) if is_sketch(lines) else ("Placement", "Before State", "After State")):
         if required not in h2:
             errors.append((1, f"YES gate requires '## {required}'"))
     if errors:
@@ -337,6 +364,8 @@ def check_change_structure(path: Path, lines: list[str], root: Path, verify_befo
             errors.append((placement_line, f"'{name}' ({action}) goes into the architecture file: add a 4th "
                            "column 'Why here' saying which capabilities it spans, or place it in "
                            "specs/<capability>/diagrams.md"))
+    if is_sketch(lines):
+        return errors + check_sketch(lines, h2, rows)
 
     before_line, _ = h2["Before State"]
     after_line, _ = h2["After State"]
@@ -631,7 +660,8 @@ def main() -> int:
                 # After the archive merge, and before the move, the Before copies no longer match
                 # the Source of Truth by design: skip that check for an already-merged change.
                 verify_before = not archived and not already_merged(lines, root)
-                problems += [(path, n, msg) for n, msg in check_change_structure(path, lines, root, verify_before)]
+                problems += [(path, n, msg) for n, msg in
+                             check_change_structure(path, lines, root, verify_before, allow_sketch=not args.trace)]
             if not archived:
                 warnings += [(path, n, msg) for n, msg in ownership_warnings(path, lines, root)]
             if args.trace and not archived:

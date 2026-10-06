@@ -43,7 +43,10 @@ GEN_DIAGRAMS = """\
 it with `openspec new change "<name>" --schema visual-driven` (full) or
 `--schema visual-driven-light` (light). In light mode (`openspec status` shows schema
 `visual-driven-light`) there is no diagrams artifact: skip the diagrams.md steps below;
-the last apply task writes it from the code as built.
+the last apply task writes it from the code as built. In sketch mode (schema
+`visual-driven-sketch`, experimental) diagrams.md is a sketch in words: follow its
+artifact instruction (artifact `diagram-sketch`: gate, Placement, `## Planned Changes`;
+no seed_before.py, no Mermaid), not the steps below; the last apply task draws the diagrams.
 
 **VSDD - diagrams.md** (full mode, schema `visual-driven`, DAG proposal -> diagrams -> specs -> design -> tasks):
 - Decide the `## Diagram needed?` gate first. A visual concern is navigation/routing,
@@ -82,7 +85,7 @@ the last apply task writes it from the code as built.
 """
 
 GUARD = """\
-> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven` or `visual-driven-light` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. The scripts in `scripts/vsdd/` are tools: run them exactly as the steps say and act on what they print; don't read their source, and use `--help` only when a step leaves you unsure how to call one. <!-- vsdd:guard -->"""
+> **VSDD:** the steps marked `vsdd:` or "(VSDD)" in this skill apply only when the OpenSpec project you are working in (the folder that holds its `openspec/` directory, which may be a package inside a monorepo) uses Visual Spec-Driven Development: its `openspec/config.yaml` uses the `visual-driven`, `visual-driven-light` or `visual-driven-sketch` schema or has rules mentioning VSDD, or the project has `docs/VSDD.md`. Otherwise skip them and follow the stock steps. Paths in those steps (`docs/VSDD.md`, `docs/MERMAID_RULES.md`, `scripts/vsdd/`) are relative to the project, unless its config `context:` names a VSDD tooling folder: then they are relative to that folder, and every script needs `--root <the OpenSpec project folder>`. The scripts in `scripts/vsdd/` are tools: run them exactly as the steps say and act on what they print; don't read their source, and use `--help` only when a step leaves you unsure how to call one. <!-- vsdd:guard -->"""
 FRONTMATTER_END = "<frontmatter-end>"  # anchor: the line after the closing `---` of the YAML front matter
 
 GEN_DECISIONS = """\
@@ -117,7 +120,8 @@ EXPLORE_CAPTURE = """\
    `diagrams.md`. Don't draw it from here: note the change in the proposal or design.
    In full mode `/opsx-propose` (or `/opsx-continue`) adds the Placement row, copies the
    Before State with `seed_before.py` and draws the After; in light mode the last apply
-   task draws them from the code as built.
+   task draws them from the code as built, and in sketch mode propose plans them in
+   words and the last apply task draws them.
 """
 
 PROPOSE_LIST = """\
@@ -136,6 +140,14 @@ APPLY_TRACE = """\
    `python3 scripts/vsdd/seed_before.py <change-name>` for the Before State; then the
    `## After State`, drawn from the code. No Deviations section. Then do the trace
    below, and tell the user the diagrams are ready to review before archiving.
+
+   **Sketch mode** (schema `visual-driven-sketch`): `diagrams.md` holds the planned
+   changes in words (`## Planned Changes`). After the code is finished, draw them as
+   the apply instruction lists: update `## Placement` to what was built, run
+   `python3 scripts/vsdd/seed_before.py <change-name>` for the Before State, write the
+   `## After State` from the code, keep `## Planned Changes`, and add a `## Deviations`
+   line for each difference from it. Then do the trace below (it rejects a diagrams.md
+   that is still a sketch), and tell the user the diagrams are ready to review.
 
    **Full mode**: if the change has a `diagrams.md` whose `## Diagram needed?` gate
    is YES, re-read its `## After State` before declaring the work complete and trace
@@ -172,6 +184,9 @@ VERIFY_FIDELITY = """\
      - Full mode only: implementation deviates from the proposal but there is no `## Deviations` section:
        - Add WARNING: "Diagram deviates from proposal but no Deviations note"
        - Recommendation: "Add a `## Deviations` section, one line per difference (proposed, built, why)"
+   - Sketch mode (schema `visual-driven-sketch`) whose `diagrams.md` still has no After State after the tasks are done:
+     - Add WARNING: "Sketch-mode diagrams were not drawn"
+     - Recommendation: "Do the Diagrams task: draw the Before/After from the code as built"
    - Light mode (schema `visual-driven-light`) with no `diagrams.md` after the tasks are done:
      - Add WARNING: "Light-mode change has no diagrams.md"
      - Recommendation: "Do the Diagrams task: write diagrams.md from the code as built"
@@ -190,6 +205,9 @@ ARCHIVE_SYNC = """\
      `visual-driven-light`): apply's Diagrams task was not done. Stop: write
      `diagrams.md` as apply step 6a describes, show it to the user for review, and
      archive only after they accept it.
+   - Still a sketch in sketch mode (`## Planned Changes`, no After State): apply's
+     Diagrams task was not done. Stop: draw them as apply step 6a describes, show them
+     to the user for review, and archive only after they accept them.
    - Missing in full mode, or gate is NO: no-op. Record "Diagrams: no-op".
    - If `scripts/vsdd/merge_diagrams.py` exists, run it with `--dry-run` first
      and show the plan, then run it for real:

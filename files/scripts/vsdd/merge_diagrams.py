@@ -113,7 +113,7 @@ def main() -> int:
         print("Diagrams: no-op (NO gate)")
         return 0
 
-    errors = check_change_structure(diagrams, lines, root, verify_before=True)
+    errors = check_change_structure(diagrams, lines, root, verify_before=True, allow_sketch=False)
     if errors and already_merged(lines, root):
         print("Diagrams: already merged (Source of Truth matches the After State) - nothing to do")
         return 0

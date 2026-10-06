@@ -9,22 +9,25 @@ carry the steps each stage needs, so an agent following them doesn't need to rea
 first: read it for a case they don't cover, a manual merge (§4), or when editing diagrams
 outside the `/opsx` steps. `docs/MERMAID_RULES.md` has the Mermaid rules with examples.
 
-**Modes.** A change is full or light, by the schema it was created with:
+**Modes.** A change is full, light or sketch, by the schema it was created with:
 
-| | Full (`visual-driven`) | Light (`visual-driven-light`) |
-|---|---|---|
-| Propose | proposal → **diagrams** → specs → design → tasks | proposal → specs → design → tasks |
-| `diagrams.md` | planned before the code: Before copied, After drawn from the design | written by the last apply task: Before copied, After drawn from the code as built |
-| Review | the plan before apply, and the corrected diagrams before archive | the as-built diagrams before archive |
-| Apply's end | trace the After State; record Deviations from the plan | trace the After State; no Deviations (nothing was planned) |
-| Archive | the same merge (§4) | the same merge (§4); a missing `diagrams.md` stops it |
+| | Full (`visual-driven`) | Light (`visual-driven-light`) | Sketch (`visual-driven-sketch`, experimental) |
+|---|---|---|---|
+| Propose | proposal → **diagrams** → specs → design → tasks | proposal → specs → design → tasks | proposal → **diagrams sketch** → specs → design → tasks |
+| `diagrams.md` | planned before the code: Before copied, After drawn from the design | written by the last apply task: Before copied, After drawn from the code as built | Placement and `## Planned Changes` (in words) at propose; Before copied and After drawn from the code by the last apply task |
+| Review | the plan before apply, and the corrected diagrams before archive | the as-built diagrams before archive | the sketch before apply, and the drawn diagrams before archive |
+| Apply's end | trace the After State; record Deviations from the plan | trace the After State; no Deviations (nothing was planned) | draw, then trace; record Deviations from Planned Changes |
+| Archive | the same merge (§4) | the same merge (§4); a missing `diagrams.md` stops it | the same merge (§4); an undrawn sketch stops it |
 
 The project default is the `schema:` line of `openspec/config.yaml`:
 `python3 scripts/vsdd/vsdd_mode.py` shows it and every in-flight change's mode, and
-`vsdd_mode.py light` or `full` sets it. One change can use the other mode:
+`vsdd_mode.py light`, `full` or `sketch` sets it. One change can use the other mode:
 `openspec new change <name> --schema visual-driven-light` (or ask the agent to propose it
-in light mode). A change keeps its mode; to switch, start it again. Both modes write the
-same `diagrams.md` format, so everything below applies to both.
+in light mode). A change keeps its mode; to switch, start it again. All modes end with the
+same `diagrams.md` format, so everything below applies to all of them. Sketch mode keeps
+`## Planned Changes` (never merged, like Deviations) as the record of the plan. It is
+experimental: it is meant to give full mode's plan review at close to light mode's cost,
+and has not been measured yet.
 
 ## 1. Source of Truth
 

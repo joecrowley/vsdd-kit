@@ -10,6 +10,17 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Added
+- Sketch mode (experimental), schema `visual-driven-sketch`. Propose writes `diagrams.md`
+  as a plan in words: the gate, the Placement table and `## Planned Changes` (one
+  `### <Stable Name>` per row), with no Mermaid and no Before copy. The last apply task
+  draws the diagrams from the code as built: `seed_before.py` for the Before State, the
+  After State, and a Deviations line for each difference from the plan. It is meant to
+  keep full mode's plan review at close to light mode's cost; it has not been measured
+  yet. `validate_mermaid.py` accepts a sketch at propose, but `--trace` and
+  `merge_diagrams.py` reject one that was never drawn. `vsdd_mode.py sketch` sets it as
+  the default; the installer copies the schema and keeps a sketch default.
+
 ## [0.3.15] - 2026-10-06
 
 ### Changed

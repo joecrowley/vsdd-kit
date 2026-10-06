@@ -1,0 +1,320 @@
+# Adapted from OpenSpec's `spec-driven` schema (https://github.com/Fission-AI/OpenSpec),
+# Copyright (c) 2024 OpenSpec Contributors, MIT License. The templates in templates/
+# are adapted from it too. Full notice: THIRD_PARTY_NOTICES.md in the VSDD kit
+# (https://github.com/joecrowley/vsdd-kit).
+name: visual-driven-sketch
+version: 1
+description: Visual SDD, sketch mode (experimental) - proposal → diagrams sketch (in words) → specs → design → tasks; the diagrams are drawn at the end of apply, from the code as built
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: Initial proposal document outlining the change
+    template: proposal.md
+    instruction: >
+      Create the proposal document that establishes WHY this change is needed.
+
+
+      Sections:
+
+      - **Why**: 1-2 sentences on the problem or opportunity. What problem does
+      this solve? Why now?
+
+      - **What Changes**: Bullet list of changes. Be specific about new
+      capabilities, modifications, or removals. Mark breaking changes with
+      **BREAKING**.
+
+      - **Capabilities**: Identify which specs will be created or modified:
+        - **New Capabilities**: List capabilities being introduced. Each becomes a new `specs/<name>/spec.md`. Use kebab-case names (e.g., `user-auth`, `data-export`).
+        - **Modified Capabilities**: List existing capabilities whose REQUIREMENTS are changing. Only include if spec-level behavior changes (not just implementation details). Each needs a delta spec file. Check `openspec/specs/` for existing spec names. Leave empty if no requirement changes.
+      - **Impact**: Affected code, APIs, dependencies, or systems.
+
+
+      IMPORTANT: The Capabilities section is critical. It creates the contract
+      between
+
+      proposal and specs phases. Research existing specs before filling this in.
+
+      Each capability listed here will need a corresponding spec file.
+
+
+      Keep it concise (1-2 pages). Focus on the "why" not the "how" -
+
+      implementation details belong in design.md.
+
+
+       This is the foundation - specs, design, and tasks all build on this.
+    requires: []
+  - id: diagram-sketch
+    generates: diagrams.md
+    description: The planned diagram changes, in words; drawn at the end of apply
+    template: diagrams.md
+    instruction: >
+      Create the diagrams sketch: which architecture diagrams this change will
+      alter, and how, IN WORDS. No Mermaid here: the diagrams are drawn at the end
+      of apply, from the code as built. The sketch is what a reviewer checks before
+      code exists.
+
+
+      Step 1 - Gate: decide whether the change affects a visual concern
+      (navigation/routing flow, state machine, data flow, infrastructure topology,
+      or data schema). Record it in `## Diagram needed?`. If NO: `NO - <one-line
+      reason>` and stop.
+
+
+      Step 2 - If YES, `## Placement`: a table (Stable name | Source of Truth file |
+      Action | Why here), one row per diagram touched. Paths are relative to
+      `openspec/`: capability diagrams in `specs/<capability>/diagrams.md`,
+      cross-cutting ones in `specs/architecture/diagrams.md`. Action is `update`,
+      `add`, `move from <old file>` or `remove`. A row that adds or moves a diagram
+      into `specs/architecture/diagrams.md` must name, in `Why here`, the
+      capabilities it spans. Use the existing stable names: list them with
+      `grep -h "^## " openspec/specs/*/diagrams.md`.
+
+
+      Step 3 - `## Planned Changes`: one `### <Stable Name>` per Placement row, each
+      a short bullet list of what changes, in words: participants, calls,
+      transitions, states or entities added, removed or rewired. Example:
+      `- + CheckoutCubit -> PaymentService.charge(order) after the order is confirmed`.
+      Name the classes and methods the code will use. Read the existing diagram
+      section only where you need to; don't copy it.
+
+
+      Step 4 - Run `python3 scripts/vsdd/validate_mermaid.py --change <change-name> --no-names`:
+      it checks the gate, the Placement table and that every row has a Planned
+      Changes entry.
+    requires:
+      - proposal
+  - id: specs
+    generates: specs/**/*.md
+    description: Detailed specifications for the change
+    template: spec.md
+    instruction: >
+      Create specification files that define WHAT the system should do.
+
+
+      Create one spec file per capability listed in the proposal's Capabilities
+      section.
+
+      - New capabilities: use the exact kebab-case name from the proposal
+      (specs/<capability>/spec.md).
+
+      - Modified capabilities: use the existing spec folder name from
+      openspec/specs/<capability>/ when creating the delta spec at
+      specs/<capability>/spec.md.
+
+
+      Delta operations (use ## headers):
+
+      - **ADDED Requirements**: New capabilities
+
+      - **MODIFIED Requirements**: Changed behavior - MUST include full updated
+      content
+
+      - **REMOVED Requirements**: Deprecated features - MUST include **Reason**
+      and **Migration**
+
+      - **RENAMED Requirements**: Name changes only - use FROM:/TO: format
+
+
+      Format requirements:
+
+      - Each requirement: `### Requirement: <name>` followed by description
+
+      - Use SHALL/MUST for normative requirements (avoid should/may)
+
+      - Each scenario: `#### Scenario: <name>` with WHEN/THEN format
+
+      - **CRITICAL**: Scenarios MUST use exactly 4 hashtags (`####`). Using 3
+      hashtags or bullets will fail silently.
+
+      - Every requirement MUST have at least one scenario.
+
+
+      MODIFIED requirements workflow:
+
+      1. Locate the existing requirement in openspec/specs/<capability>/spec.md
+
+      2. Copy the ENTIRE requirement block (from `### Requirement:` through all
+      scenarios)
+
+      3. Paste under `## MODIFIED Requirements` and edit to reflect new behavior
+
+      4. Ensure header text matches exactly (whitespace-insensitive)
+
+
+      Common pitfall: Using MODIFIED with partial content loses detail at
+      archive time.
+
+      If adding new concerns without changing existing behavior, use ADDED
+      instead.
+
+
+      Example:
+
+      ```
+
+      ## ADDED Requirements
+
+
+      ### Requirement: User can export data
+
+      The system SHALL allow users to export their data in CSV format.
+
+
+      #### Scenario: Successful export
+
+      - **WHEN** user clicks "Export" button
+
+      - **THEN** system downloads a CSV file with all user data
+
+
+      ## REMOVED Requirements
+
+
+      ### Requirement: Legacy export
+
+      **Reason**: Replaced by new export system
+
+      **Migration**: Use new export endpoint at /api/v2/export
+
+      ```
+
+
+      Specs should be testable - each scenario is a potential test case.
+    requires:
+      - diagram-sketch
+  - id: design
+    generates: design.md
+    description: Technical design document with implementation details
+    template: design.md
+    instruction: >
+      Create the design document that explains HOW to implement the change.
+
+
+      When to include design.md (create only if any apply):
+
+      - Cross-cutting change (multiple services/modules) or new architectural
+      pattern
+
+      - New external dependency or significant data model changes
+
+      - Security, performance, or migration complexity
+
+      - Ambiguity that benefits from technical decisions before coding
+
+
+      Sections:
+
+      - **Context**: Background, current state, constraints, stakeholders
+
+      - **Goals / Non-Goals**: What this design achieves and explicitly excludes
+
+      - **Decisions**: Key technical choices with rationale (why X over Y?).
+      Include alternatives considered for each decision.
+
+      - **Risks / Trade-offs**: Known limitations, things that could go wrong.
+      Format: [Risk] → Mitigation
+
+      - **Migration Plan**: Steps to deploy, rollback strategy (if applicable)
+
+      - **Open Questions**: Outstanding decisions or unknowns to resolve
+
+
+      Architecture decisions (VSDD): before choosing an approach, read
+      `openspec/specs/architecture/decisions.md` if it exists. Follow every rule
+      whose "Applies to" matches this change. If the design deliberately breaks
+      one, say so under Decisions as `Overrides: <Stable Name> - <why>`.
+
+
+      Focus on architecture and approach, not line-by-line implementation.
+
+      Reference the proposal for motivation and specs for requirements.
+
+
+      Good design docs explain the "why" behind technical decisions.
+    requires:
+      - specs
+  - id: tasks
+    generates: tasks.md
+    description: Implementation checklist with trackable tasks
+    template: tasks.md
+    instruction: >
+      Create the task list that breaks down the implementation work.
+
+
+      **IMPORTANT: Follow the template below exactly.** The apply phase parses
+
+      checkbox format to track progress. Tasks not using `- [ ]` won't be
+      tracked.
+
+
+      Guidelines:
+
+      - Group related tasks under ## numbered headings
+
+      - Each task MUST be a checkbox: `- [ ] X.Y Task description`
+
+      - Tasks should be small enough to complete in one session
+
+      - Order tasks by dependency (what must be done first?)
+
+
+      Example:
+
+      ```
+
+      ## 1. Setup
+
+
+      - [ ] 1.1 Create new module structure
+
+      - [ ] 1.2 Add dependencies to package.json
+
+
+      ## 2. Core Implementation
+
+
+      - [ ] 2.1 Implement data export function
+
+      - [ ] 2.2 Add CSV formatting utilities
+
+      ```
+
+
+      Reference specs for what needs to be built, design for how to build it.
+
+      Each task should be verifiable - you know when it's done.
+
+
+      VSDD sketch mode: if diagrams.md records a YES gate, end the list with a
+      final group `## <N>. Diagrams (VSDD)` holding one task,
+      `- [ ] <N>.1 Draw diagrams.md from the code as built (Before/After)`.
+    requires:
+      - design
+apply:
+  requires:
+    - tasks
+  tracks: tasks.md
+  instruction: |
+    Read context files, work through pending tasks, mark complete as you go.
+    Pause if you hit blockers or need clarification.
+    VSDD sketch mode: if diagrams.md records a YES gate, it holds the planned changes
+    in words. After the code is finished, do the Diagrams task: draw them from the
+    code as built. The steps below have what it needs; you don't need to read
+    docs/VSDD.md or docs/MERMAID_RULES.md first.
+    1. Update `## Placement` if the built code touches other diagrams than planned.
+    2. Run `python3 scripts/vsdd/seed_before.py <change-name>` for the Before State.
+       Never edit the Before by hand.
+    3. `## After State`: one `### <Stable Name>` per update, add and move row (none for
+       remove): a one-line description, then the mermaid block, drawn from the code
+       as built. Keep `## Planned Changes` as it is: it is the record of the plan.
+       Mermaid: quote node and edge labels that contain spaces or punctuation, but never
+       a sequence-diagram participant alias; explicit activate/deactivate, not +/- on
+       arrows; every flowchart declares a direction (flowchart LR); no semicolons in a
+       diagram. sequenceDiagram for flows, stateDiagram-v2 for state machines,
+       flowchart for topology, erDiagram for data schemas.
+    4. Where the build differs from Planned Changes, add a top-level `## Deviations`
+       section: one line per difference,
+       `- **<what>:** proposed <X>, built <Y>. Why: <25 words at most>`.
+    5. Run `python3 scripts/vsdd/validate_mermaid.py --trace <change-name>` and fix
+       what it reports. Tell the user the diagrams are ready to review before archiving.
