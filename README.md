@@ -37,7 +37,8 @@ exists.
   change; **full mode** also draws them before the code, so you can review the design
   first. In our test runs (one Flutter app, one local model, a handful of runs per
   mode), light mode cost about the same time as plain OpenSpec, and full mode about
-  10-15% more time and a third more tokens, with no difference in the code produced.
+  10-15% more time and about a quarter more agent turns, with no difference in the
+  code produced.
   Full mode is worth it when someone will actually review the plan; otherwise use
   light. See [Modes](#day-to-day-use).
 - [The case for VSDD](docs/WHY_VSDD.md) covers the benefits, the costs and the
