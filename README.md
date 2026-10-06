@@ -89,13 +89,10 @@ transitions to the ReadingListCubit state machine.
 
 ## Deviations
 
-- **Proposed:** `BookApi.patchNotes(id, text)`, next to `patchStatus` (design D3).
-  **Built:** one `BookApi.patchBook(id, changes)`, used for notes and status alike.
-  `ApiBookRepository.updateStatus` now calls `patchBook(id, {'status': ...})`, so the
-  Status Update Flow changed too, and got a Placement row.
-  **Why:** a reviewer asked for one PATCH path for all book fields during apply
-  (the redirect in the testdrive walkthrough, §5.5): it avoids a second copy of the
-  latency, lookup and 404 handling.
+- **`BookApi` patch call:** proposed `patchNotes(id, text)`, next to `patchStatus` (design D3), built one
+  `patchBook(id, changes)` for notes and status alike, so `Status Update Flow` changed too and got a
+  Placement row. Why: a reviewer asked for one PATCH path during apply (the redirect in the testdrive
+  walkthrough, §5.5), avoiding a second copy of the latency, lookup and 404 handling.
 ````
 
 ## Quick start

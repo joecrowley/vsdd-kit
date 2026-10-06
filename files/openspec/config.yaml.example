@@ -41,7 +41,7 @@ rules:
 operations:
   apply:
     guidance:
-      - "VSDD: if the change's diagrams.md has a YES gate, before finishing trace its After State against the code: run python3 scripts/vsdd/validate_mermaid.py --trace <change-name> (it fails on names no source file contains and lists where the others are), then check they are on the call path. Where the code differs, update the After State to match and add a top-level `## Deviations` section (Proposed / Built / Why)."
+      - "VSDD: if the change's diagrams.md has a YES gate, before finishing trace its After State against the code: run python3 scripts/vsdd/validate_mermaid.py --trace <change-name> (it fails on names no source file contains and lists where the others are), then check they are on the call path. Where the code differs, update the After State to match and add a top-level `## Deviations` section: one line per difference, `- **<what>:** proposed <X>, built <Y>. Why: <25 words at most>`."
   archive:
     guidance:
       - "VSDD: before moving the change to the archive, merge its diagrams.md into the Source of Truth: run python3 scripts/vsdd/merge_diagrams.py <change dir> (with --dry-run first). Without the script, apply every row of its `## Placement` table as described in docs/VSDD.md section 4 (remove, move from <old file>, update, add). Skip if the gate is NO. Never touch sections without a Placement row, and never merge Before State, Placement or Deviations. Run python3 scripts/vsdd/validate_mermaid.py afterwards, then python3 scripts/vsdd/catalog_diagrams.py to refresh docs/DIAGRAMS.md, and include a Diagrams line in the archive summary."

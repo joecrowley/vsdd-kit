@@ -10,6 +10,21 @@ command that `status` prints.
 
 ## [Unreleased]
 
+### Changed
+- Full mode no longer asks the agent to audit diagrams the change does not touch. The
+  diagrams instruction, `docs/VSDD.md` and the propose overlay said to list every stale
+  Source of Truth section in `## Source of Truth drift` and suggest a sync change. That
+  contradicted the 0.3.8 scoping of `validate_mermaid.py --change`. Now, if
+  `seed_before.py` warns about an untouched diagram, the agent mentions it in one line
+  and moves on. Drift in the sections the change does touch is recorded as before.
+- `## Deviations` is one line per difference,
+  `- **<what>:** proposed <X>, built <Y>. Why: <25 words at most>`, instead of
+  Proposed / Built / Why prose. The schema, template, overlay, `docs/VSDD.md`, the
+  config guidance and the book-notes example use it. An upgrade replaces the old
+  Deviations guidance in `openspec/config.yaml`.
+- Both are consistency cleanups and are not expected to save measurable time: the 0.3.14
+  trim saved nothing measurable, and same-mode runs vary by about 14 minutes.
+
 ## [0.3.14] - 2026-10-04
 
 ### Changed

@@ -56,5 +56,6 @@ YES
 
 <!-- If implementation later deviates from the proposed After State, add a
      top-level `## Deviations` section (a sibling of Before/After State, NOT a
-     merge target) recording: what was proposed, what was built, and why. Do NOT
-     keep a parallel "expected" diagram. -->
+     merge target), one line per difference:
+     `- **<what>:** proposed <X>, built <Y>. Why: <25 words at most>`.
+     Do NOT keep a parallel "expected" diagram. -->
