@@ -84,7 +84,7 @@ KIT_VERSION = (KIT_FILES.parent / "VERSION").read_text(encoding="utf-8").strip()
 STAMP = Path("openspec") / ".vsdd.json"
 SCRIPTS = ("validate_mermaid.py", "install_overlay.py", "merge_diagrams.py", "seed_before.py",
            "catalog_diagrams.py", "vsdd_mode.py", "openspec_preflight.py", "vsdd_snapshot.py")
-VSDD_SCHEMAS = ("visual-driven", "visual-driven-light")  # full mode, light mode
+VSDD_SCHEMAS = ("visual-driven", "visual-driven-light", "visual-driven-sketch")  # full, light, sketch mode
 SECTION = "## OpenSpec & Visual Spec-Driven Development"
 POINTER_MARK = "vsdd:pointer"
 CHECK_CHANGE = "vsdd-install-check"
@@ -523,8 +523,8 @@ class Installer:
         if self.custom_schema and self.args.custom_schema == "keep":
             self.todo.append(f"Step 3 (b): add the diagrams artifact to the custom schema '{self.schema}' "
                              "by hand, then `openspec schema validate` it")
-        elif re.search(r"^schema:\s*visual-driven-light\s*$", text, re.M):
-            notes.append("schema: visual-driven-light (light mode kept)")
+        elif m := re.search(r"^schema:\s*(visual-driven-(?:light|sketch))\s*$", text, re.M):
+            notes.append(f"schema: {m.group(1)} ({m.group(1).split('-')[-1]} mode kept)")
         elif re.search(r"^schema:", text, re.M):
             text = re.sub(r"^schema:.*$", "schema: visual-driven", text, count=1, flags=re.M)
             notes.append("schema: visual-driven")

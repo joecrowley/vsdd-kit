@@ -48,7 +48,7 @@ echo "  info  skills per tool: $(ls -d .claude/skills/openspec-* .opencode/skill
 
 step "2. copy kit files"
 mkdir -p openspec/schemas docs scripts/vsdd
-cp -R "$KIT"/files/openspec/schemas/visual-driven "$KIT"/files/openspec/schemas/visual-driven-light openspec/schemas/
+cp -R "$KIT"/files/openspec/schemas/visual-driven "$KIT"/files/openspec/schemas/visual-driven-light "$KIT"/files/openspec/schemas/visual-driven-sketch openspec/schemas/
 cp "$KIT"/files/docs/VSDD.md "$KIT"/files/docs/MERMAID_RULES.md docs/
 cp "$KIT"/files/scripts/vsdd/*.py scripts/vsdd/
 openspec schema validate visual-driven 2>&1 | grep -q "is valid" && pass "schema valid" || fail "schema invalid"
@@ -209,6 +209,26 @@ write_owner "spans smoke-cap and reading"
 OUT="$(python3 scripts/vsdd/validate_mermaid.py 2>&1)" && grep -q "warning: this change creates smoke-cap" <<<"$OUT" \
   && pass "new-capability flow in architecture file passes with a warning" || fail "ownership warning missing, or reason not accepted"
 rm -rf openspec/changes/vsdd-smoke-test/specs
+# Sketch mode: Placement + Planned Changes (words) at propose; drawn at the end of apply
+write_sketch() {  # $1 = stable name under Planned Changes
+  printf '## Diagram needed?\n\nYES - sketch\n\n## Placement\n\n| Stable name | Source of Truth file | Action |\n|---|---|---|\n' > "$C"
+  printf '| Module Hierarchy | specs/architecture/diagrams.md | update |\n\n## Planned Changes\n\n### %s\n\n- + UI calls CORE directly\n' "$1" >> "$C"
+}
+write_sketch "Module Hierarchy"
+python3 scripts/vsdd/validate_mermaid.py --change vsdd-smoke-test --no-names >/dev/null \
+  && pass "sketch mode: Placement + Planned Changes validates without Before/After" || fail "sketch rejected: $(python3 scripts/vsdd/validate_mermaid.py --change vsdd-smoke-test --no-names | head -3)"
+write_sketch "Other Name"
+OUT="$(python3 scripts/vsdd/validate_mermaid.py --change vsdd-smoke-test --no-names 2>&1)" \
+  || { grep -q "needs '### Module Hierarchy' under Planned Changes" <<<"$OUT" && grep -q "'Other Name' has no Placement row" <<<"$OUT"; } \
+  && pass "sketch mode: Planned Changes must match the Placement rows" || fail "sketch row mismatch not caught"
+write_sketch "Module Hierarchy"; cp "$SOT" "$ROOT/sot.sketch"
+! python3 scripts/vsdd/validate_mermaid.py --trace vsdd-smoke-test >/dev/null 2>&1 \
+  && ! python3 scripts/vsdd/merge_diagrams.py openspec/changes/vsdd-smoke-test >/dev/null 2>&1 && cmp -s "$SOT" "$ROOT/sot.sketch" \
+  && pass "sketch mode: --trace and the archive merge reject an undrawn sketch" || fail "undrawn sketch accepted by --trace or merge"
+python3 scripts/vsdd/seed_before.py vsdd-smoke-test >/dev/null && printf '\n## After State\n\n### Module Hierarchy\n%s\n' "$SEC" >> "$C" \
+  && python3 scripts/vsdd/validate_mermaid.py --change vsdd-smoke-test --no-names >/dev/null && grep -q "^## Planned Changes" "$C" \
+  && pass "sketch mode: seed_before + After State make it a full change, Planned Changes kept" || fail "drawn sketch: $(python3 scripts/vsdd/validate_mermaid.py --change vsdd-smoke-test --no-names | head -3)"
+rm -f "$ROOT/sot.sketch"
 
 step "8b. archive merge (merge_diagrams.py)"
 cp "$SOT" "$ROOT/sot.bak"
@@ -304,7 +324,7 @@ git switch -q -c vsdd-install
 XDG_CONFIG_HOME="$XR" python3 "$SNAPPY" save --out "$SNAP" >/dev/null && [ -f "$SNAP/manifest.json" ] \
   && pass "snapshot saved (untracked .claude + global config)" || fail "snapshot save"
 mkdir -p openspec/schemas docs scripts/vsdd
-cp -R "$KIT"/files/openspec/schemas/visual-driven "$KIT"/files/openspec/schemas/visual-driven-light openspec/schemas/
+cp -R "$KIT"/files/openspec/schemas/visual-driven "$KIT"/files/openspec/schemas/visual-driven-light "$KIT"/files/openspec/schemas/visual-driven-sketch openspec/schemas/
 cp "$KIT"/files/docs/VSDD.md "$KIT"/files/docs/MERMAID_RULES.md docs/
 cp "$KIT"/files/scripts/vsdd/*.py scripts/vsdd/
 cp "$KIT"/files/openspec/config.yaml.example openspec/config.yaml
@@ -478,6 +498,12 @@ OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && grep -q "^
   && grep -q "light mode kept" <<<"$OUT" && grep -q "3 config check: rules reach" <<<"$OUT" \
   && pass "re-running the installer keeps a light default (config check still passes)" || fail "installer reset the light default: $(grep '^schema' openspec/config.yaml)"
 $MODE full >/dev/null && grep -q "^schema: visual-driven$" openspec/config.yaml && pass "vsdd_mode.py full restores full mode" || fail "vsdd_mode.py full"
+openspec schema validate visual-driven-sketch >/dev/null 2>&1 && $MODE sketch >/dev/null && grep -q "^schema: visual-driven-sketch$" openspec/config.yaml \
+  && openspec new change sk-smoke >/dev/null 2>&1 && openspec status --change sk-smoke 2>&1 | grep -q "diagram-sketch" && $MODE | grep -q "sk-smoke: sketch" \
+  && pass "sketch mode: installer copies the sketch schema (valid); a new change takes it, with a diagram-sketch artifact" || fail "sketch mode: $(openspec status --change sk-smoke 2>&1 | tail -3)"
+rm -rf openspec/changes/sk-smoke; git add -A; git -c user.email=s@t -c user.name=smoke commit -qm sketch
+OUT="$(HOME="$IH" python3 "$INST" --root . --tools "$TOOLS" 2>&1)" && grep -q "^schema: visual-driven-sketch$" openspec/config.yaml && grep -q "sketch mode kept" <<<"$OUT" \
+  && pass "re-running the installer keeps a sketch default" || fail "installer reset the sketch default: $(grep '^schema' openspec/config.yaml)"
 git reset -q --hard "$LIGHT_BASE"; git clean -qfd
 # Upgrade from a kit that told agents to read both docs before any diagram
 sed -i.bak 's|^    - "Mermaid: quote.*$|    - "Read `docs/VSDD.md` and `docs/MERMAID_RULES.md` before drafting any diagram."|' openspec/config.yaml && rm -f openspec/config.yaml.bak
