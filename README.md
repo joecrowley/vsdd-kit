@@ -40,7 +40,10 @@ exists.
   10-15% more time and about a quarter more agent turns, with no difference in the
   code produced.
   Full mode is worth it when someone will actually review the plan; otherwise use
-  light. See [Modes](#day-to-day-use).
+  light. **Sketch mode** (experimental) plans the diagram changes in words before the
+  code, for that review, and draws them once at the end: in three runs it cost about
+  7 minutes more than light mode per change (with a lot of spread), against full
+  mode's 16-50 on another night. See [Modes](#day-to-day-use).
 - [The case for VSDD](docs/WHY_VSDD.md) covers the benefits, the costs and the
   objections in more depth.
 
@@ -236,9 +239,12 @@ and Qwen).
 That is **full mode**. In **light mode** propose writes no diagrams; the last apply task
 draws `diagrams.md` from the code as built, and you review it before archiving. It skips
 the planning and the plan-versus-code reconciliation, at the price of not seeing a
-diagram of the design before the code is written. Switch the project default with
-`python3 scripts/vsdd/vsdd_mode.py light` (or `full`; no argument shows the mode of the
-project and of each change), or ask for one change "in light mode" when proposing it.
+diagram of the design before the code is written. In **sketch mode** (experimental)
+propose writes the planned diagram changes in words (`## Planned Changes`, no Mermaid)
+for you to review before apply, and the last apply task draws them from the code. Switch
+the project default with `python3 scripts/vsdd/vsdd_mode.py light` (or `full` or
+`sketch`; no argument shows the mode of the project and of each change), or ask for one
+change "in light mode" when proposing it.
 Details: `docs/VSDD.md`, Modes.
 
 ```bash

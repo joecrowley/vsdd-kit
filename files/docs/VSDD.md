@@ -26,8 +26,10 @@ The project default is the `schema:` line of `openspec/config.yaml`:
 in light mode). A change keeps its mode; to switch, start it again. All modes end with the
 same `diagrams.md` format, so everything below applies to all of them. Sketch mode keeps
 `## Planned Changes` (never merged, like Deviations) as the record of the plan. It is
-experimental: it is meant to give full mode's plan review at close to light mode's cost,
-and has not been measured yet.
+experimental: it is meant to give full mode's plan review at close to light mode's cost.
+In one pilot (one change, one local model, three runs per mode, a scripted reviewer
+comment after propose) it cost a median 7 minutes more than light mode, with the runs
+pointing both ways, and the code was no different.
 
 ## 1. Source of Truth
 
