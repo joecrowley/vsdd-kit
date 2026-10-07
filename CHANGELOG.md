@@ -10,6 +10,8 @@ command that `status` prints.
 
 ## [Unreleased]
 
+## [0.3.16] - 2026-10-07
+
 ### Added
 - Sketch mode (experimental), schema `visual-driven-sketch`. Propose writes `diagrams.md`
   as a plan in words: the gate, the Placement table and `## Planned Changes` (one
@@ -366,7 +368,8 @@ The first tagged release. It contains everything since the kit began, on 2026-09
 - OpenSpec 1.13 support: the `operations` backstop, `changeRoot`, and the
   `update-change` skill.
 
-[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.15...HEAD
+[Unreleased]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.16...HEAD
+[0.3.16]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.15...v0.3.16
 [0.3.15]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.14...v0.3.15
 [0.3.14]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.13...v0.3.14
 [0.3.13]: https://github.com/joecrowley/vsdd-kit/compare/v0.3.12...v0.3.13
